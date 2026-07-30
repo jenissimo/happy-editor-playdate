@@ -1,10 +1,13 @@
 import type { ImageTint } from '../../core/scene/types'
 
 /**
- * Approximate Playdate `kDrawModeFillWhite` / `FillBlack` on a rect that was
- * just blitted: opaque ink → solid tint color; transparency stays clear.
- * CSS `filter: brightness() invert()` is NOT equivalent — it floods the
- * element's paint bounds and turns sparse stamps into solid rectangles.
+ * Approximate Playdate `kDrawModeFillWhite` / `FillBlack` on a clear bitmap:
+ * opaque ink → solid tint color; transparency stays clear.
+ *
+ * MUST run on an offscreen image (or empty canvas), then blit the result.
+ * Applying this to a scene framebuffer after drawImage recolors the
+ * background showing through transparent holes — selected-row icons on a
+ * black chip become solid white squares.
  */
 export function applyImageTint(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,

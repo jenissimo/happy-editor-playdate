@@ -1,6 +1,6 @@
 import { SCREEN_H, SCREEN_W } from '../../core/constants'
 import type { IndexedAsset } from '../../core/assets/types'
-import type { Scene, SceneNode } from '../../core/scene/types'
+import type { ImageTint, Scene, SceneNode } from '../../core/scene/types'
 import {
   drawBitmapText,
   loadPlaydateFont,
@@ -199,6 +199,45 @@ async function getFont(
   return font
 }
 
+/** Tint on a clear offscreen bitmap, then blit — never on the scene
+ *  framebuffer. Post-composite tint sees the background through holes and
+ *  recolors it too (selected-row icons → solid white squares on black chips). */
+function blitImageTinted(
+  ctx: Any2D,
+  src: CanvasImage,
+  x: number,
+  y: number,
+  tint: ImageTint | undefined,
+  createCanvas?: CanvasFactory,
+) {
+  const tw = src.width
+  const th = src.height
+  if (tw < 1 || th < 1) return
+  if (!tint || tint === 'none') {
+    ctx.drawImage(src, x, y)
+    return
+  }
+  const make =
+    createCanvas ??
+    ((cw: number, ch: number) => {
+      const c = document.createElement('canvas')
+      c.width = cw
+      c.height = ch
+      return c
+    })
+  const tmp = make(tw, th)
+  const tctx = tmp.getContext('2d')
+  if (!tctx) {
+    ctx.drawImage(src, x, y)
+    return
+  }
+  tctx.imageSmoothingEnabled = false
+  tctx.clearRect(0, 0, tw, th)
+  tctx.drawImage(src, 0, 0)
+  applyImageTint(tctx, 0, 0, tw, th, tint)
+  ctx.drawImage(tmp as CanvasImageSource, x, y)
+}
+
 async function drawNodeContent(
   ctx: Any2D,
   node: SceneNode,
@@ -235,17 +274,20 @@ async function drawNodeContent(
         })
         const frame = frames[idx - 1]
         if (frame) {
-          const src = bit(frame as CanvasImage)
-          ctx.drawImage(src, x, y)
-          applyImageTint(ctx, x, y, src.width, src.height, node.tint)
+          blitImageTinted(
+            ctx,
+            bit(frame as CanvasImage),
+            x,
+            y,
+            node.tint,
+            makeCanvas,
+          )
           drew = true
         }
       } else {
         const img = assets.getImage(node.asset)
         if (img) {
-          const src = bit(img)
-          ctx.drawImage(src, x, y)
-          applyImageTint(ctx, x, y, src.width, src.height, node.tint)
+          blitImageTinted(ctx, bit(img), x, y, node.tint, makeCanvas)
           drew = true
         }
       }
