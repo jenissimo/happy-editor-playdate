@@ -48,10 +48,12 @@ describe('parseAssetName', () => {
   })
 
   test('font with size', () => {
+    // basePath keeps the full stem so it matches Stem-table-W-H.png and
+    // Playdate font.new("…/Stem"); fontSize is metadata only.
     const a = parseAssetName('fonts/Roobert-11.fnt')
     expect(a).toMatchObject({
       kind: 'font',
-      basePath: 'fonts/Roobert',
+      basePath: 'fonts/Roobert-11',
       fontSize: 11,
       extension: 'fnt',
     })

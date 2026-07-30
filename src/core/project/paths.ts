@@ -109,13 +109,20 @@ function isPlaydateSource(dir: string): boolean {
 }
 
 function looksLikeHostGame(dir: string): boolean {
-  const source = join(dir, 'Source')
-  if (!isPlaydateSource(source)) return false
+  // Playdate hosts historically use `Source/`; Nyandoku uses `source/`.
+  const source =
+    [join(dir, 'Source'), join(dir, 'source')].find(isPlaydateSource) ?? null
+  if (!source) return false
   return (
     existsSync(join(dir, 'scenes')) ||
     existsSync(join(dir, '.playdate-editor', 'project.json')) ||
     existsSync(join(dir, '.playdate-editor'))
   )
+}
+
+/** Strip trailing separators so `editor` === `editor/` on Windows. */
+function normPath(p: string): string {
+  return normalize(p).replace(/[\\/]+$/, '')
 }
 
 function hasProjectConfig(dir: string): boolean {
@@ -141,16 +148,13 @@ function resolveRoot(): { root: string; rootSource: ProjectPaths['rootSource'] }
   const fromEnv = envRoot()
   if (fromEnv) return { root: fromEnv, rootSource: 'env' }
 
-  const cwd = normalize(process.cwd())
-  const pkg = normalize(PACKAGE_ROOT)
+  const cwd = normPath(process.cwd())
+  const pkg = normPath(PACKAGE_ROOT)
   const parent = dirname(pkg)
 
   // Submodule zero-config: `bun dev` inside the editor package, host game is parent.
-  if (
-    cwd === pkg &&
-    parent !== pkg &&
-    looksLikeHostGame(parent)
-  ) {
+  // Must win over hasFixtureLayout(package) — the editor repo always has playdate/.
+  if (cwd === pkg && parent !== pkg && looksLikeHostGame(parent)) {
     return { root: parent, rootSource: 'parent-host' }
   }
 

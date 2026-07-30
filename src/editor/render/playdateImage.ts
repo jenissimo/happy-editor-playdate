@@ -7,14 +7,16 @@
  * preview like the Simulator without rewriting files on disk.
  */
 
-export type CanvasFactory = (
-  w: number,
-  h: number,
-) => {
+/** Minimal 2d surface — HTMLCanvasElement or OffscreenCanvas. */
+export type BitmapCanvas = {
   width: number
   height: number
-  getContext: (id: '2d') => CanvasRenderingContext2D | null
+  getContext: (
+    id: '2d',
+  ) => CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null
 }
+
+export type CanvasFactory = (w: number, h: number) => BitmapCanvas
 
 /** Default threshold used by Playdate's simple greyscale→1-bit import. */
 export const PLAYDATE_1BIT_THRESHOLD = 128

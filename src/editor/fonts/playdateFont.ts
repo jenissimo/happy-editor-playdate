@@ -397,8 +397,10 @@ function getTintScratch(
   return { canvas: tintScratch, ctx: tintScratchCtx }
 }
 
+type Any2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+
 function drawGlyphColored(
-  ctx: CanvasRenderingContext2D,
+  ctx: Any2D,
   font: LoadedPlaydateFont,
   g: PlaydateGlyph,
   dx: number,
@@ -451,7 +453,7 @@ function drawGlyphColored(
 }
 
 function paintBitmapTextPass(
-  ctx: CanvasRenderingContext2D,
+  ctx: Any2D,
   font: LoadedPlaydateFont,
   lines: string[],
   opts: {
@@ -515,7 +517,7 @@ function paintBitmapTextPass(
 
 /** Draw 1-bit style text into a 2D context. Order: shadow → outer → inner → fill. */
 export function drawBitmapText(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   font: LoadedPlaydateFont,
   opts: DrawBitmapTextOpts,
 ): void {

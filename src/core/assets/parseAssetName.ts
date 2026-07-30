@@ -59,11 +59,13 @@ export function parseAssetName(path: string): ParsedAsset | null {
   const { dir, stem, ext } = splitPath(trimmed)
 
   if (ext === 'fnt') {
+    // Keep the full stem as basePath so it matches companion
+    // `Stem-table-W-H.png` AND Playdate's font.new("…/Stem") path.
+    // Trailing -NN is size metadata only (e.g. PixelOperatorSC-Bold-17).
     const m = stem.match(FONT_SIZE)
     const fontSize = m ? Number(m[1]) : undefined
-    const logical = m ? stem.slice(0, -m[0].length) : stem
     return {
-      basePath: joinBase(dir, logical),
+      basePath: joinBase(dir, stem),
       fileStem: stem,
       extension: ext,
       kind: 'font',

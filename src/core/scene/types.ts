@@ -63,11 +63,19 @@ export type TextNode = BaseNode & {
   align: TextAlign
   /** Vertical alignment within the text box. Omitted → top. */
   valign?: TextVAlign
+  /** Glyph fill ink. Omitted → black. */
+  color?: Ink
   /** Layer-style outline around glyphs (optional outer ring). Drawn after shadow, before fill. */
   outline?: TextOutline | null
   /** Layer-style drop shadow. Drawn first (shadow → outline → fill). */
   shadow?: TextShadow | null
 }
+
+/**
+ * Playdate image draw-mode tint. Omitted / `none` = `kDrawModeCopy`.
+ * `white` / `black` map to FillWhite / FillBlack (opaque ink → that color).
+ */
+export type ImageTint = 'none' | 'black' | 'white'
 
 export type ImageNode = BaseNode & {
   type: 'image'
@@ -86,6 +94,8 @@ export type ImageNode = BaseNode & {
   frameEnd?: number
   /** Static 1-based frame when fps is 0 / omitted. Default = frameStart. */
   frame?: number
+  /** Optional 1-bit ink tint (selected-row icons, etc.). */
+  tint?: ImageTint
 }
 
 export type PanelNode = BaseNode & {

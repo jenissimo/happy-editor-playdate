@@ -222,6 +222,11 @@
               "default": "top",
               "description": "Vertical alignment inside the text box"
             },
+            "color": {
+              "$ref": "#/$defs/ink",
+              "default": "black",
+              "description": "Glyph fill ink. Omitted → black."
+            },
             "outline": {
               "description": "Glyph outline (8-direction rings). Primary = inner; optional outer ring further out. null/absent = off. Clipped to node box.",
               "oneOf": [
@@ -325,6 +330,11 @@
               "type": "integer",
               "minimum": 1,
               "description": "Static 1-based frame when fps is 0"
+            },
+            "tint": {
+              "enum": ["none", "black", "white"],
+              "default": "none",
+              "description": "Playdate draw-mode tint. none/omit = Copy; white/black = FillWhite/FillBlack"
             }
           }
         }

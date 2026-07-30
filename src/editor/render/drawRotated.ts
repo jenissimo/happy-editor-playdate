@@ -27,7 +27,7 @@ function sampleY(v: number): number {
 }
 
 export function drawRotatedNearest(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   source: CanvasImageSource,
   centerX: number,
   centerY: number,

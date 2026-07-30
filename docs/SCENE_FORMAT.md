@@ -100,29 +100,32 @@ On device, call `Ui.setState("confirm")` (same filter rule as the editor).
 
 `font` is a logical Playdate path without extension. Empty or missing
 resolves to **`fonts/Roobert-11-Medium`** (bundled default) — never the OS
-system / monospace font.
+system / monospace font. The path must match the on-disk stem
+(e.g. `fonts/PixelOperatorSC-Bold-17/PixelOperatorSC-Bold-17`) so it lines up
+with the companion `*-table-W-H.png` and `gfx.font.new(...)`.
 
-Optional layer-style effects (clipped to the text box; leave padding so they
-are not cut off):
+Optional glyph fill + layer-style effects (effects are clipped to the text
+box; leave padding so they are not cut off):
 
 | Field | Meaning |
 |---|---|
+| `color` | Glyph fill ink: `black` \| `white`. Omitted → `black`. Needed for inverted chips / selected rows |
 | `outline` | `{ width, color, outer? }` — 8-direction glyph rings. Primary is the **inner** ring (`width` default `1`). Optional `outer: { width, color }` draws further out (rings `width+1 .. width+outer.width`). Classic readable UI: white inner + black outer. `null` / absent = off |
 | `shadow` | `{ x, y, color }` — single offset drop shadow (defaults `1,1`). `null` / absent = off |
 
-Draw order: **shadow → outer outline → inner outline → fill**. `color` is `black` \| `white`.
+Draw order: **shadow → outer outline → inner outline → fill**. Ink is `black` \| `white`.
 
 ```json
 {
   "text": "Score: 1000",
   "font": "fonts/Roobert-11-Medium",
   "align": "left",
+  "color": "white",
   "outline": {
     "width": 1,
-    "color": "white",
-    "outer": { "width": 1, "color": "black" }
+    "color": "black"
   },
-  "shadow": { "x": 1, "y": 1, "color": "white" }
+  "shadow": { "x": 1, "y": 1, "color": "black" }
 }
 ```
 
@@ -163,6 +166,7 @@ Imagetable (animated sprite) — same node type, point `asset` at a Playdate tab
 | `loop` | Loop within range (default `true`) |
 | `frameStart` / `frameEnd` | 1-based inclusive range (Playdate imagetable indices) |
 | `frame` | Static frame when `fps` is 0 |
+| `tint` | `none` / omit = Copy; `white` / `black` = FillWhite / FillBlack (selected-row icons, etc.) |
 
 On device, call `Ui.update(dt)` each frame so animation advances (same clock as tweens).
 

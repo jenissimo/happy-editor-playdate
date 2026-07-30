@@ -49,8 +49,34 @@ function nodeVisible(node: SceneNode, state: string): boolean {
   return node.states.includes(state)
 }
 
+type Any2D =
+  | CanvasRenderingContext2D
+  | OffscreenCanvasRenderingContext2D
+
+/** Approximate Playdate FillWhite / FillBlack on the just-blitted image rect. */
+function applyImageTint(
+  ctx: Any2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  tint: 'black' | 'white' | 'none' | undefined,
+) {
+  if (!tint || tint === 'none' || w < 1 || h < 1) return
+  const id = ctx.getImageData(x, y, w, h)
+  const px = id.data
+  const ink = tint === 'white' ? 255 : 0
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3]! < 16) continue
+    px[i] = ink
+    px[i + 1] = ink
+    px[i + 2] = ink
+  }
+  ctx.putImageData(id, x, y)
+}
+
 function drawNineSlice(
-  ctx: CanvasRenderingContext2D,
+  ctx: Any2D,
   img: CanvasImage,
   slice: { left: number; right: number; top: number; bottom: number },
   dx: number,
@@ -127,7 +153,7 @@ function drawNineSlice(
 }
 
 function drawFrame(
-  ctx: CanvasRenderingContext2D,
+  ctx: Any2D,
   node: Extract<SceneNode, { type: 'frame' }>,
   x: number,
   y: number,
@@ -195,7 +221,7 @@ async function getFont(
 }
 
 async function drawNodeContent(
-  ctx: CanvasRenderingContext2D,
+  ctx: Any2D,
   node: SceneNode,
   x: number,
   y: number,
@@ -217,6 +243,7 @@ async function drawNodeContent(
     }
     case 'image': {
       const frames = assets.getImagetableFrames?.(node.asset)
+      let drew = false
       if (frames && frames.length > 0) {
         const p = imageAnimParams(node, frames.length)
         const idx = animFrameIndex({
@@ -228,18 +255,24 @@ async function drawNodeContent(
           staticFrame: p.staticFrame,
         })
         const frame = frames[idx - 1]
-        if (frame) ctx.drawImage(bit(frame as CanvasImage), x, y)
-        else {
-          ctx.strokeStyle = '#000'
-          ctx.strokeRect(x + 0.5, y + 0.5, node.w - 1, node.h - 1)
+        if (frame) {
+          const src = bit(frame as CanvasImage)
+          ctx.drawImage(src, x, y)
+          applyImageTint(ctx, x, y, src.width, src.height, node.tint)
+          drew = true
         }
       } else {
         const img = assets.getImage(node.asset)
-        if (img) ctx.drawImage(bit(img), x, y)
-        else {
-          ctx.strokeStyle = '#000'
-          ctx.strokeRect(x + 0.5, y + 0.5, node.w - 1, node.h - 1)
+        if (img) {
+          const src = bit(img)
+          ctx.drawImage(src, x, y)
+          applyImageTint(ctx, x, y, src.width, src.height, node.tint)
+          drew = true
         }
+      }
+      if (!drew) {
+        ctx.strokeStyle = '#000'
+        ctx.strokeRect(x + 0.5, y + 0.5, node.w - 1, node.h - 1)
       }
       break
     }
@@ -283,7 +316,7 @@ async function drawNodeContent(
           y,
           width: node.w,
           height: node.h,
-          fillStyle: '#000000',
+          color: node.color ?? 'black',
           outline: node.outline,
           shadow: node.shadow,
         })
@@ -300,7 +333,7 @@ async function drawNodeContent(
 }
 
 async function drawNode(
-  ctx: CanvasRenderingContext2D,
+  ctx: Any2D,
   node: SceneNode,
   assets: SceneDrawAssets,
   state: string,

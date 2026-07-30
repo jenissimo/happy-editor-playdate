@@ -218,6 +218,18 @@ export function ContextOptionsBar() {
               onChange={(font) => patch({ font }, 'Edit font')}
             />
           </div>
+          <ChoiceTiles
+            label="Ink"
+            value={selected.color ?? 'black'}
+            disabled={locked}
+            columns={2}
+            options={(['black', 'white'] as const).map((color) => ({
+              value: color,
+              label: color,
+              preview: <InkSwatch color={color} />,
+            }))}
+            onChange={(color) => patch({ color }, 'Text color')}
+          />
           <input
             className="context-text"
             value={selected.text}
@@ -329,6 +341,33 @@ export function ContextOptionsBar() {
               onChange={(asset) => patch({ asset }, 'Asset')}
             />
           </div>
+          {selected.type === 'image' && (
+            <ChoiceTiles
+              label="Tint"
+              value={selected.tint ?? 'none'}
+              disabled={locked}
+              columns={3}
+              options={
+                (
+                  [
+                    ['none', 'copy'],
+                    ['black', 'black'],
+                    ['white', 'white'],
+                  ] as const
+                ).map(([value, label]) => ({
+                  value,
+                  label,
+                  preview:
+                    value === 'none' ? (
+                      <InkSwatch color="black" />
+                    ) : (
+                      <InkSwatch color={value} />
+                    ),
+                }))
+              }
+              onChange={(tint) => patch({ tint }, 'Image tint')}
+            />
+          )}
         </>
       )}
     </div>

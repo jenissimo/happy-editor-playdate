@@ -127,6 +127,7 @@ function NodeContent({
           width={node.w}
           height={node.h}
           assets={assetsList(assets)}
+          color={node.color ?? 'black'}
           outline={node.outline}
           shadow={node.shadow}
         />
@@ -137,6 +138,13 @@ function NodeContent({
       if (!src) {
         return <div className="node-renderer__missing" title="Missing image" />
       }
+      // Approximate Playdate FillWhite / FillBlack for 1-bit stamps.
+      const tintFilter =
+        node.tint === 'white'
+          ? 'brightness(0) invert(1)'
+          : node.tint === 'black'
+            ? 'brightness(0)'
+            : undefined
       return (
         <img
           className="node-renderer__image"
@@ -150,6 +158,7 @@ function NodeContent({
             imageRendering: 'pixelated',
             display: 'block',
             pointerEvents: interactive ? 'auto' : 'none',
+            filter: tintFilter,
           }}
         />
       )

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { IndexedAsset } from '../../core/assets/types'
 import type {
+  Ink,
   TextAlign,
   TextOutline,
   TextShadow,
@@ -22,6 +23,7 @@ type Props = {
   height: number
   assets: IndexedAsset[]
   className?: string
+  color?: Ink
   outline?: TextOutline | null
   shadow?: TextShadow | null
 }
@@ -36,6 +38,7 @@ export function BitmapText({
   height,
   assets,
   className,
+  color = 'black',
   outline = null,
   shadow = null,
 }: Props) {
@@ -74,6 +77,7 @@ export function BitmapText({
         valign,
         width: w,
         height: h,
+        color,
         outline,
         shadow,
       })
@@ -82,7 +86,7 @@ export function BitmapText({
     return () => {
       cancelled = true
     }
-  }, [text, fontPath, align, valign, width, height, assets, outline, shadow])
+  }, [text, fontPath, align, valign, width, height, assets, color, outline, shadow])
 
   return (
     <canvas

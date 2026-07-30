@@ -559,7 +559,16 @@ local function drawNodeContent(node, x, y)
     elseif t == "image" then
         local img = drawableImage(node)
         if img then
+            local tint = node.tint
+            if tint == "white" then
+                gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+            elseif tint == "black" then
+                gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
+            end
             img:draw(x, y)
+            if tint == "white" or tint == "black" then
+                gfx.setImageDrawMode(gfx.kDrawModeCopy)
+            end
         else
             gfx.drawRect(x, y, node.w, node.h)
         end
@@ -666,7 +675,7 @@ local function drawNodeContent(node, x, y)
             drawOutlineRing(1, ow, outline.color or "black")
         end
 
-        drawTextInk(0, 0, "black")
+        drawTextInk(0, 0, node.color or "black")
         gfx.clearClipRect()
     end
 end
