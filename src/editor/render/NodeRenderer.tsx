@@ -6,6 +6,7 @@ import { BitmapText } from '../fonts/BitmapText'
 import { nodeRect } from '../geometry'
 import { NineSlice } from './NineSlice'
 import { ShapePreview } from './ShapePreview'
+import { TintedImage } from './TintedImage'
 
 export type AssetLookup =
   | Map<string, IndexedAsset>
@@ -138,27 +139,17 @@ function NodeContent({
       if (!src) {
         return <div className="node-renderer__missing" title="Missing image" />
       }
-      // Approximate Playdate FillWhite / FillBlack for 1-bit stamps.
-      const tintFilter =
-        node.tint === 'white'
-          ? 'brightness(0) invert(1)'
-          : node.tint === 'black'
-            ? 'brightness(0)'
-            : undefined
       return (
-        <img
+        <TintedImage
           className="node-renderer__image"
           src={src}
+          width={node.w}
+          height={node.h}
+          tint={node.tint}
           alt={node.name}
           draggable={false}
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'fill',
-            imageRendering: 'pixelated',
-            display: 'block',
             pointerEvents: interactive ? 'auto' : 'none',
-            filter: tintFilter,
           }}
         />
       )

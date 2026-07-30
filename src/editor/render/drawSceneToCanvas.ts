@@ -10,6 +10,7 @@ import {
 } from '../fonts/playdateFont'
 import { drawRotatedNearest } from './drawRotated'
 import { animFrameIndex, imageAnimParams } from './imagetable'
+import { applyImageTint } from './imageTint'
 import { asPlaydateBitmap, type CanvasFactory } from './playdateImage'
 import { rasterizeShape } from './procedural'
 
@@ -52,28 +53,6 @@ function nodeVisible(node: SceneNode, state: string): boolean {
 type Any2D =
   | CanvasRenderingContext2D
   | OffscreenCanvasRenderingContext2D
-
-/** Approximate Playdate FillWhite / FillBlack on the just-blitted image rect. */
-function applyImageTint(
-  ctx: Any2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  tint: 'black' | 'white' | 'none' | undefined,
-) {
-  if (!tint || tint === 'none' || w < 1 || h < 1) return
-  const id = ctx.getImageData(x, y, w, h)
-  const px = id.data
-  const ink = tint === 'white' ? 255 : 0
-  for (let i = 0; i < px.length; i += 4) {
-    if (px[i + 3]! < 16) continue
-    px[i] = ink
-    px[i + 1] = ink
-    px[i + 2] = ink
-  }
-  ctx.putImageData(id, x, y)
-}
 
 function drawNineSlice(
   ctx: Any2D,
