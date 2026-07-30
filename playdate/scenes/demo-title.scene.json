@@ -35,6 +35,31 @@
       }
     },
     {
+      "id": "bg-rays",
+      "name": "Backdrop Rays",
+      "type": "shape",
+      "x": 0,
+      "y": 84,
+      "w": 400,
+      "h": 60,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": true,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "dither",
+        "pattern": "horizontal",
+        "color": "white"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
       "id": "vignette-top",
       "name": "Vignette Top",
       "type": "shape",
@@ -89,13 +114,37 @@
       }
     },
     {
+      "id": "card-shadow",
+      "name": "Card Shadow",
+      "type": "shape",
+      "x": 52,
+      "y": 24,
+      "w": 304,
+      "h": 176,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 6,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
       "id": "card",
       "name": "Title Card",
       "type": "panel",
       "x": 48,
-      "y": 24,
+      "y": 20,
       "w": 304,
-      "h": 168,
+      "h": 176,
       "anchor": {
         "x": 0,
         "y": 0
@@ -112,11 +161,134 @@
       }
     },
     {
+      "id": "card-rule",
+      "name": "Card Inner Rule",
+      "type": "shape",
+      "x": 56,
+      "y": 28,
+      "w": 288,
+      "h": 160,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "none"
+      },
+      "stroke": {
+        "kind": "dashed",
+        "thickness": 1,
+        "dash": 3,
+        "gap": 3,
+        "color": "black"
+      }
+    },
+    {
+      "id": "rivet-tl",
+      "name": "Rivet TL",
+      "type": "shape",
+      "x": 60,
+      "y": 32,
+      "w": 5,
+      "h": 5,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 2,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "rivet-tr",
+      "name": "Rivet TR",
+      "type": "shape",
+      "x": 335,
+      "y": 32,
+      "w": 5,
+      "h": 5,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 2,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "rivet-bl",
+      "name": "Rivet BL",
+      "type": "shape",
+      "x": 60,
+      "y": 179,
+      "w": 5,
+      "h": 5,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 2,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "rivet-br",
+      "name": "Rivet BR",
+      "type": "shape",
+      "x": 335,
+      "y": 179,
+      "w": 5,
+      "h": 5,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 2,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
       "id": "brand-frame",
       "name": "Brand Frame",
       "type": "frame",
       "x": 68,
-      "y": 40,
+      "y": 30,
       "w": 264,
       "h": 48,
       "anchor": {
@@ -134,7 +306,7 @@
       "name": "Title",
       "type": "text",
       "x": 68,
-      "y": 42,
+      "y": 32,
       "w": 264,
       "h": 26,
       "anchor": {
@@ -159,7 +331,7 @@
       "name": "Tagline",
       "type": "text",
       "x": 68,
-      "y": 68,
+      "y": 58,
       "w": 264,
       "h": 16,
       "anchor": {
@@ -175,15 +347,159 @@
       "valign": "middle"
     },
     {
+      "id": "rule-left",
+      "name": "Divider Left",
+      "type": "shape",
+      "x": 84,
+      "y": 82,
+      "w": 100,
+      "h": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "rule-right",
+      "name": "Divider Right",
+      "type": "shape",
+      "x": 216,
+      "y": 82,
+      "w": 100,
+      "h": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "rule-diamond",
+      "name": "Divider Diamond",
+      "type": "shape",
+      "x": 200,
+      "y": 82,
+      "w": 8,
+      "h": 8,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "rotation": 45,
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "glow-left",
+      "name": "Stage Glow Left",
+      "type": "shape",
+      "x": 60,
+      "y": 86,
+      "w": 110,
+      "h": 56,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "gradient",
+        "axis": "h",
+        "from": 0.35,
+        "to": 0,
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "glow-right",
+      "name": "Stage Glow Right",
+      "type": "shape",
+      "x": 230,
+      "y": 86,
+      "w": 110,
+      "h": 56,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "gradient",
+        "axis": "h",
+        "from": 0,
+        "to": 0.35,
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "paw-plate",
+      "name": "Paw Plate",
+      "type": "image",
+      "x": 200,
+      "y": 134,
+      "w": 88,
+      "h": 24,
+      "anchor": {
+        "x": 0.5,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "asset": "images/paw_plate"
+    },
+    {
       "id": "paw",
       "name": "Paw",
       "type": "image",
-      "x": 172,
-      "y": 100,
-      "w": 56,
-      "h": 60,
+      "x": 200,
+      "y": 88,
+      "w": 48,
+      "h": 52,
       "anchor": {
-        "x": 0,
+        "x": 0.5,
         "y": 0
       },
       "states": [],
@@ -192,11 +508,35 @@
       "asset": "images/paw_print"
     },
     {
+      "id": "btn-shadow",
+      "name": "Start Button Shadow",
+      "type": "shape",
+      "x": 138,
+      "y": 160,
+      "w": 128,
+      "h": 22,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 4,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
       "id": "btn-panel",
       "name": "Start Button",
       "type": "panel",
       "x": 136,
-      "y": 160,
+      "y": 158,
       "w": 128,
       "h": 22,
       "anchor": {
@@ -215,12 +555,60 @@
       }
     },
     {
+      "id": "btn-a-badge",
+      "name": "A Button Badge",
+      "type": "shape",
+      "x": 167,
+      "y": 160,
+      "w": 18,
+      "h": 18,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "cornerRadius": 9,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "btn-a-letter",
+      "name": "A Button Letter",
+      "type": "text",
+      "x": 167,
+      "y": 159,
+      "w": 18,
+      "h": 20,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "text": "A",
+      "font": "fonts/Roobert-10-Bold",
+      "align": "center",
+      "valign": "middle",
+      "outline": {
+        "width": 2,
+        "color": "white"
+      }
+    },
+    {
       "id": "btn-label",
       "name": "Start Label",
       "type": "text",
-      "x": 136,
-      "y": 160,
-      "w": 128,
+      "x": 191,
+      "y": 158,
+      "w": 64,
       "h": 22,
       "anchor": {
         "x": 0,
@@ -229,9 +617,9 @@
       "states": [],
       "visible": true,
       "locked": false,
-      "text": "A  START",
+      "text": "START",
       "font": "fonts/Roobert-10-Bold",
-      "align": "center",
+      "align": "left",
       "valign": "middle"
     },
     {
@@ -252,6 +640,62 @@
       "text": "crank to peek - A to begin",
       "font": "fonts/Roobert-10-Bold",
       "align": "center",
+      "valign": "middle",
+      "outline": {
+        "width": 1,
+        "color": "white",
+        "outer": {
+          "width": 1,
+          "color": "black"
+        }
+      }
+    },
+    {
+      "id": "footer-studio",
+      "name": "Footer Studio",
+      "type": "text",
+      "x": 56,
+      "y": 219,
+      "w": 150,
+      "h": 16,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "text": "pawpixel games",
+      "font": "fonts/Roobert-11-Mono-Condensed",
+      "align": "left",
+      "valign": "middle",
+      "outline": {
+        "width": 1,
+        "color": "white",
+        "outer": {
+          "width": 1,
+          "color": "black"
+        }
+      }
+    },
+    {
+      "id": "footer-version",
+      "name": "Footer Version",
+      "type": "text",
+      "x": 344,
+      "y": 219,
+      "w": 150,
+      "h": 16,
+      "anchor": {
+        "x": 1,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "text": "v0.1 demo",
+      "font": "fonts/Roobert-11-Mono-Condensed",
+      "align": "right",
       "valign": "middle",
       "outline": {
         "width": 1,

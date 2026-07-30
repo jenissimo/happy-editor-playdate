@@ -7,13 +7,23 @@ import {
   findProviderBinary,
   type AssistantMode,
 } from './providers.ts'
-import type { AssistantProvider } from '../project/paths.ts'
+import {
+  createAssistantStreamState,
+  flushAssistantStream,
+  parseAssistantStreamChunk,
+} from './streamParse.ts'
+import type {
+  AssistantEffort,
+  AssistantProvider,
+} from '../project/paths.ts'
 
 export type AssistantRunInput = {
   provider: AssistantProvider
   mode: AssistantMode
   prompt: string
   cwd: string
+  effort?: AssistantEffort
+  model?: string
   /** Soft timeout in ms (default 5 minutes). */
   timeoutMs?: number
 }
@@ -21,6 +31,7 @@ export type AssistantRunInput = {
 export type AssistantChunk =
   | { type: 'stdout'; text: string }
   | { type: 'stderr'; text: string }
+  | { type: 'step'; label: string; tool?: string }
   | { type: 'done'; code: number | null; signal: NodeJS.Signals | null }
   | { type: 'error'; message: string }
 
@@ -37,6 +48,8 @@ export function startAssistantRun(
     prompt: input.prompt,
     cwd: input.cwd,
     binary,
+    effort: input.effort,
+    model: input.model,
   })
   if ('error' in cmd) {
     onChunk({ type: 'error', message: cmd.error })
@@ -67,6 +80,30 @@ export function startAssistantRun(
     onChunk(chunk)
   }
 
+  const streamState = createAssistantStreamState()
+  let emittedText = false
+
+  const emitParsed = (
+    events: ReturnType<typeof parseAssistantStreamChunk>,
+  ) => {
+    for (const ev of events) {
+      if (ev.kind === 'step') {
+        onChunk({ type: 'step', label: ev.label, tool: ev.tool })
+      } else if (ev.kind === 'text') {
+        if (ev.text) {
+          emittedText = true
+          onChunk({ type: 'stdout', text: ev.text })
+        }
+      } else if (ev.kind === 'result') {
+        // Prefer streamed assistant text; result is a fallback when none arrived.
+        if (!emittedText && ev.text) {
+          emittedText = true
+          onChunk({ type: 'stdout', text: ev.text })
+        }
+      }
+    }
+  }
+
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const timer = setTimeout(() => {
     child.kill('SIGTERM')
@@ -80,7 +117,7 @@ export function startAssistantRun(
   child.stdout.setEncoding('utf8')
   child.stderr.setEncoding('utf8')
   child.stdout.on('data', (text: string) => {
-    if (text) onChunk({ type: 'stdout', text })
+    if (text) emitParsed(parseAssistantStreamChunk(text, streamState))
   })
   child.stderr.on('data', (text: string) => {
     if (text) onChunk({ type: 'stderr', text })
@@ -92,6 +129,7 @@ export function startAssistantRun(
   })
   child.on('close', (code, signal) => {
     clearTimeout(timer)
+    emitParsed(flushAssistantStream(streamState))
     settle({ type: 'done', code, signal })
   })
 

@@ -2482,6 +2482,63 @@ button {
   font-size: 11px;
 }
 
+.nibble-chat__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 1.2em;
+}
+
+.nibble-chat__step {
+  color: #666;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.nibble-chat__step.is-current {
+  color: #b0b0b0;
+  animation: nibble-step-fade 1.1s ease-in-out infinite;
+}
+
+.nibble-chat__step-inline {
+  margin-top: 0.4rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid #333;
+  color: #888;
+  font-size: 10px;
+  animation: nibble-step-fade 1.1s ease-in-out infinite;
+}
+
+.nibble-chat__caret {
+  display: inline-block;
+  width: 0.45em;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: #9a9a9a;
+  animation: nibble-caret-blink 1s step-end infinite;
+}
+
+@keyframes nibble-caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes nibble-step-fade {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .nibble-chat__footer {
   border-top: 1px solid #333;
   padding: 0.45rem;

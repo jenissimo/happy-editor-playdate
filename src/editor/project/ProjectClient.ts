@@ -82,12 +82,15 @@ export type AssistantRunRequest = {
   activeState?: string
   selectedIds?: string[]
   selectedSummary?: string
+  /** Raw base64 PNG (no data: prefix) of the 400×240 scene preview. */
+  previewPngBase64?: string
 }
 
 export type AssistantRunHandlers = {
   onStart?: (data: Record<string, unknown>) => void
   onStdout?: (text: string) => void
   onStderr?: (text: string) => void
+  onStep?: (label: string, tool?: string) => void
   onError?: (message: string, code?: string) => void
   onDone?: (result: { code: number | null; signal: string | null }) => void
 }
@@ -266,6 +269,11 @@ export class ProjectClient {
               handlers.onStdout?.(payload.text)
             } else if (event === 'stderr' && typeof payload.text === 'string') {
               handlers.onStderr?.(payload.text)
+            } else if (event === 'step' && typeof payload.label === 'string') {
+              handlers.onStep?.(
+                payload.label,
+                typeof payload.tool === 'string' ? payload.tool : undefined,
+              )
             } else if (event === 'error' && typeof payload.message === 'string') {
               handlers.onError?.(payload.message)
             } else if (event === 'done') {

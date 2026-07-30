@@ -22,9 +22,25 @@ export const PACKAGE_ROOT = normalize(
 
 export type AssistantProvider = 'cursor' | 'claude' | 'codex'
 
+export type AssistantEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+export const DEFAULT_ASSISTANT_EFFORT: AssistantEffort = 'medium'
+
+export const ASSISTANT_EFFORTS: readonly AssistantEffort[] = [
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+] as const
+
 export type AssistantConfig = {
   /** Headless CLI used by Nibble. Set at project install time. */
   provider: AssistantProvider
+  /** Reasoning effort (default medium). Mapped per CLI. */
+  effort?: AssistantEffort
+  /** Optional provider model / alias. */
+  model?: string
 }
 
 export type ProjectConfig = {
@@ -194,7 +210,24 @@ function mergeAssistant(
   ) {
     return undefined
   }
-  return { provider: provider as AssistantProvider }
+  const cfg: AssistantConfig = { provider: provider as AssistantProvider }
+  if (
+    typeof raw.effort === 'string' &&
+    ASSISTANT_EFFORTS.includes(raw.effort as AssistantEffort)
+  ) {
+    cfg.effort = raw.effort as AssistantEffort
+  }
+  if (typeof raw.model === 'string' && raw.model.trim()) {
+    cfg.model = raw.model.trim()
+  }
+  return cfg
+}
+
+export function isAssistantEffort(value: unknown): value is AssistantEffort {
+  return (
+    typeof value === 'string' &&
+    ASSISTANT_EFFORTS.includes(value as AssistantEffort)
+  )
 }
 
 export function isAssistantProvider(value: unknown): value is AssistantProvider {

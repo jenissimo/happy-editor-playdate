@@ -5,12 +5,15 @@ export type NibbleStatus =
   | 'error'
   | 'unconfigured'
 
-export function nibbleStatusLabel(status: NibbleStatus): string {
+export function nibbleStatusLabel(
+  status: NibbleStatus,
+  stepLabel?: string | null,
+): string {
   switch (status) {
     case 'idle':
       return 'Ready'
     case 'thinking':
-      return 'Thinking…'
+      return stepLabel?.trim() || 'Thinking…'
     case 'success':
       return 'Done'
     case 'error':

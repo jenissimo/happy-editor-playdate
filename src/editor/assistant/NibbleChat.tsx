@@ -49,6 +49,11 @@ export function NibbleChat({
     null,
   )
   const [busy, setBusy] = useState(false)
+  const [stepLabel, setStepLabel] = useState<string | null>(null)
+  const [steps, setSteps] = useState<string[]>([])
+  const [activeAssistantId, setActiveAssistantId] = useState<string | null>(
+    null,
+  )
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<{ abort: () => void } | null>(null)
@@ -78,7 +83,7 @@ export function NibbleChat({
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
-  }, [messages, busy])
+  }, [messages, busy, steps])
 
   useEffect(() => {
     if (!open) return
@@ -121,10 +126,13 @@ export function NibbleChat({
       { id: `u-${Date.now()}`, role: 'user', text },
     ])
     setBusy(true)
+    setStepLabel('Starting…')
+    setSteps([])
     onStatusChange('thinking')
     replyRef.current = ''
 
     const assistantId = `a-${Date.now()}`
+    setActiveAssistantId(assistantId)
     setMessages((prev) => [
       ...prev,
       { id: assistantId, role: 'assistant', text: '' },
@@ -152,6 +160,24 @@ export function NibbleChat({
         editor.beginNibbleSession(label)
       }
 
+      setStepLabel('Capturing…')
+      let previewPngBase64: string | undefined
+      try {
+        const { captureScenePreviewPng } = await import(
+          '../render/captureScenePreview'
+        )
+        const png = await captureScenePreviewPng(
+          editor.scene,
+          editor.assets,
+          editor.activeState,
+        )
+        if (png) previewPngBase64 = png
+      } catch {
+        /* run without preview */
+      }
+
+      setStepLabel('Packing context…')
+
       abortRef.current = projectClient.runAssistant(
         {
           message: text,
@@ -160,11 +186,20 @@ export function NibbleChat({
           activeState: editor.activeState,
           selectedIds: editor.selectedIds,
           selectedSummary: summarizeSelection(editor.selectedNodes),
+          previewPngBase64,
         },
         {
           onStdout: updateAssistant,
           onStderr: () => {
             /* keep stderr out of the chat bubble; status/errors surface separately */
+          },
+          onStep: (label) => {
+            setStepLabel(label)
+            setSteps((prev) =>
+              prev.length > 0 && prev[prev.length - 1] === label
+                ? prev
+                : [...prev, label].slice(-8),
+            )
           },
           onError: (message, code) => {
             sawError = true
@@ -173,41 +208,52 @@ export function NibbleChat({
             updateAssistant(replyRef.current ? `\n\n${message}` : message)
           },
           onDone: (result) => {
-            editor.endNibbleSession()
-            setBusy(false)
-            abortRef.current = null
-            const aborted = result.signal === 'aborted'
-            const failed =
-              sawError ||
-              (result.code !== null && result.code !== 0 && !aborted)
-            if (aborted) {
-              onStatusChange('idle')
-            } else if (failed) {
-              if (!sawError) onStatusChange('error')
-            } else {
-              onStatusChange('success')
-              window.setTimeout(() => onStatusChange('idle'), 1200)
-            }
-            if (!replyRef.current.trim()) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        text: failed
-                          ? 'Nibble finished with an error and no reply text.'
-                          : 'Nibble finished.',
-                      }
-                    : m,
-                ),
-              )
-            }
+            void (async () => {
+              if (mode === 'edit') {
+                setStepLabel('Applying scene…')
+                await editor.finishNibbleSession()
+              } else {
+                editor.endNibbleSession()
+              }
+              setBusy(false)
+              setStepLabel(null)
+              setActiveAssistantId(null)
+              abortRef.current = null
+              const aborted = result.signal === 'aborted'
+              const failed =
+                sawError ||
+                (result.code !== null && result.code !== 0 && !aborted)
+              if (aborted) {
+                onStatusChange('idle')
+              } else if (failed) {
+                if (!sawError) onStatusChange('error')
+              } else {
+                onStatusChange('success')
+                window.setTimeout(() => onStatusChange('idle'), 1200)
+              }
+              if (!replyRef.current.trim()) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          text: failed
+                            ? 'Nibble finished with an error and no reply text.'
+                            : 'Nibble finished.',
+                        }
+                      : m,
+                  ),
+                )
+              }
+            })()
           },
         },
       )
     } catch (e) {
       editor.endNibbleSession()
       setBusy(false)
+      setStepLabel(null)
+      setActiveAssistantId(null)
       onStatusChange('error')
       const msg = e instanceof Error ? e.message : 'Request failed'
       setMessages((prev) =>
@@ -223,6 +269,8 @@ export function NibbleChat({
     abortRef.current = null
     editor.endNibbleSession()
     setBusy(false)
+    setStepLabel(null)
+    setActiveAssistantId(null)
     onStatusChange('idle')
   }
 
@@ -233,7 +281,7 @@ export function NibbleChat({
         <div className="nibble-chat__titles">
           <strong>Nibble</strong>
           <span className="nibble-chat__meta">
-            {nibbleStatusLabel(status)} · {providerBadge}
+            {nibbleStatusLabel(status, stepLabel)} · {providerBadge}
           </span>
         </div>
         <div className="nibble-chat__modes" role="group" aria-label="Mode">
@@ -271,14 +319,43 @@ export function NibbleChat({
             <code>{editor.scene.name}.scene.json</code>.
           </p>
         )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`nibble-chat__bubble nibble-chat__bubble--${m.role}`}
-          >
-            {m.text || (m.role === 'assistant' && busy ? '…' : '')}
-          </div>
-        ))}
+        {messages.map((m) => {
+          const isActiveReply = busy && m.id === activeAssistantId
+          return (
+            <div
+              key={m.id}
+              className={`nibble-chat__bubble nibble-chat__bubble--${m.role}`}
+            >
+              {m.text}
+              {isActiveReply && m.text && (
+                <span className="nibble-chat__caret" aria-hidden="true" />
+              )}
+              {isActiveReply && !m.text && (
+                <div className="nibble-chat__steps" aria-live="polite">
+                  {(steps.length > 0 ? steps : [stepLabel ?? 'Thinking…']).map(
+                    (s, i, arr) => (
+                      <span
+                        key={`${s}-${i}`}
+                        className={
+                          i === arr.length - 1
+                            ? 'nibble-chat__step is-current'
+                            : 'nibble-chat__step'
+                        }
+                      >
+                        {s}
+                      </span>
+                    ),
+                  )}
+                </div>
+              )}
+              {isActiveReply && m.text && stepLabel && stepLabel !== 'Writing…' && (
+                <div className="nibble-chat__step-inline" aria-live="polite">
+                  {stepLabel}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <footer className="nibble-chat__footer">

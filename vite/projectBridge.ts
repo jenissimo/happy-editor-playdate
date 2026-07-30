@@ -3,6 +3,8 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  writeFileSync,
+  copyFileSync,
   watch,
   type FSWatcher,
 } from 'node:fs'
@@ -38,11 +40,18 @@ import {
   providerDisplayName,
   type AssistantMode,
 } from '../src/core/assistant/providers.ts'
-import { buildAssistantPrompt } from '../src/core/assistant/prompt.ts'
+import {
+  buildAssistantCliPrompt,
+  buildAssistantInstructions,
+  buildNodeInventory,
+} from '../src/core/assistant/prompt.ts'
 import { startAssistantRun } from '../src/core/assistant/run.ts'
 import {
+  DEFAULT_ASSISTANT_EFFORT,
+  isAssistantEffort,
   isAssistantProvider,
   readProjectConfigFile,
+  type AssistantEffort,
   type AssistantProvider,
 } from '../src/core/project/paths.ts'
 
@@ -111,6 +120,8 @@ function resolveAssistantProvider(): {
   available: boolean
   binary: string | null
   displayName: string | null
+  effort: AssistantEffort
+  model?: string
 } {
   const fromFile = readProjectConfigFile(EDITOR_DIR)
   const provider = fromFile?.assistant?.provider ?? null
@@ -120,14 +131,105 @@ function resolveAssistantProvider(): {
       available: false,
       binary: null,
       displayName: null,
+      effort: DEFAULT_ASSISTANT_EFFORT,
     }
   }
   const binary = findProviderBinary(provider)
+  const effort = isAssistantEffort(fromFile?.assistant?.effort)
+    ? fromFile!.assistant!.effort!
+    : DEFAULT_ASSISTANT_EFFORT
+  const model =
+    typeof fromFile?.assistant?.model === 'string'
+      ? fromFile.assistant.model.trim() || undefined
+      : undefined
   return {
     provider,
     available: Boolean(binary),
     binary,
     displayName: providerDisplayName(provider),
+    effort,
+    ...(model ? { model } : {}),
+  }
+}
+
+function relFromRoot(absPath: string): string {
+  return relative(ROOT, absPath).replace(/\\/g, '/')
+}
+
+function prepareNibbleRunPack(input: {
+  mode: AssistantMode
+  message: string
+  sceneFile: SceneFile
+  schemaPath: string
+  activeState: string
+  selectedIds: string[]
+  selectedSummary?: string
+  previewPngBase64?: string
+  effort: AssistantEffort
+  provider: AssistantProvider
+}): {
+  prompt: string
+  hasPreview: boolean
+  instructionsRel: string
+} {
+  const runDir = join(EDITOR_DIR, 'nibble-run')
+  mkdirSync(runDir, { recursive: true })
+
+  const formatSrc = join(PACKAGE_ROOT, 'docs', 'SCENE_FORMAT.md')
+  const formatDest = join(runDir, 'SCENE_FORMAT.md')
+  if (existsSync(formatSrc)) {
+    copyFileSync(formatSrc, formatDest)
+  }
+
+  let hasPreview = false
+  const previewDest = join(runDir, 'preview.png')
+  const b64 = input.previewPngBase64?.trim()
+  if (b64) {
+    try {
+      writeFileSync(previewDest, Buffer.from(b64, 'base64'))
+      hasPreview = true
+    } catch {
+      hasPreview = false
+    }
+  }
+
+  const instructionsPath = join(runDir, 'INSTRUCTIONS.md')
+  const instructionsRel = relFromRoot(instructionsPath)
+  const formatRel = existsSync(formatDest)
+    ? relFromRoot(formatDest)
+    : relFromRoot(formatSrc)
+  const previewRel = hasPreview ? relFromRoot(previewDest) : undefined
+  const sceneRel = relFromRoot(input.sceneFile.path)
+  const schemaRel = relFromRoot(input.schemaPath)
+
+  const effortNote =
+    input.provider === 'cursor'
+      ? `${input.effort} (Cursor: use model id / suffix; see project assistant.model)`
+      : input.effort
+
+  const instructions = buildAssistantInstructions({
+    mode: input.mode,
+    userMessage: input.message,
+    sceneName: input.sceneFile.name,
+    scenePath: sceneRel,
+    schemaPath: schemaRel,
+    formatDocPath: formatRel,
+    previewPath: previewRel,
+    activeState: input.activeState,
+    selectedIds: input.selectedIds,
+    selectedSummary: input.selectedSummary,
+    nodeInventory: buildNodeInventory(input.sceneFile.scene),
+    effortNote,
+  })
+  writeFileSync(instructionsPath, `${instructions}\n`, 'utf8')
+
+  return {
+    prompt: buildAssistantCliPrompt({
+      instructionsRel,
+      hasPreview,
+    }),
+    hasPreview,
+    instructionsRel,
   }
 }
 
@@ -154,21 +256,21 @@ export function playdateProjectBridge(): Plugin {
     for (const dir of dirs) {
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
       try {
-        const w = watch(dir, { recursive: true }, (kind, filename) => {
+        const w = watch(dir, { recursive: true }, (_kind, filename) => {
           if (!filename) return
           const name = filename.toString().replace(/\\/g, '/')
           if (name.endsWith('.tmp')) return
           if (name.includes('.scene.json') || dir === SCENES_DIR) {
-            if (name.endsWith('.scene.json') && kind !== 'rename') {
+            // Handle both 'change' and 'rename' — Windows atomic writes are renames.
+            if (name.endsWith('.scene.json')) {
               try {
-                const full = join(
-                  SCENES_DIR,
-                  name.includes('/') ? name.split('/').pop()! : name,
-                )
+                const base = name.includes('/') ? name.split('/').pop()! : name
+                const full = join(SCENES_DIR, base)
                 const path = existsSync(full)
                   ? full
                   : listScenes().find((s: SceneFile) =>
-                      s.relativePath.endsWith(name),
+                      s.relativePath.endsWith(name) ||
+                      s.relativePath.endsWith(base),
                     )?.path
                 if (path) {
                   const file = readSceneFile(path)
@@ -186,9 +288,17 @@ export function playdateProjectBridge(): Plugin {
                     relativePath: file.relativePath,
                     diagnostics: file.diagnostics,
                   })
+                } else {
+                  // Strip extension so the client can fetch by scene name.
+                  const sceneName = base.replace(/\.scene\.json$/i, '')
+                  notify('playdate:scene-changed', { name: sceneName })
                 }
               } catch {
-                notify('playdate:scene-changed', { error: true, name })
+                const base = name.includes('/') ? name.split('/').pop()! : name
+                notify('playdate:scene-changed', {
+                  error: true,
+                  name: base.replace(/\.scene\.json$/i, ''),
+                })
               }
             } else {
               notify('playdate:scene-changed', { name })
@@ -426,6 +536,7 @@ export function playdateProjectBridge(): Plugin {
               activeState?: string
               selectedIds?: string[]
               selectedSummary?: string
+              previewPngBase64?: string
             }
             const message = body.message?.trim()
             if (!message) {
@@ -461,14 +572,11 @@ export function playdateProjectBridge(): Plugin {
               return sendJson(res, 404, { error: 'scene not found' })
             }
 
-            const formatDocPath = join(PACKAGE_ROOT, 'docs', 'SCENE_FORMAT.md')
-            const prompt = buildAssistantPrompt({
+            const pack = prepareNibbleRunPack({
               mode,
-              userMessage: message,
-              sceneName: sceneFile.name,
-              scenePath: sceneFile.path,
+              message,
+              sceneFile,
               schemaPath: SCHEMA_PATH,
-              formatDocPath,
               activeState: body.activeState?.trim() || 'default',
               selectedIds: Array.isArray(body.selectedIds)
                 ? body.selectedIds.filter((id) => typeof id === 'string')
@@ -477,6 +585,12 @@ export function playdateProjectBridge(): Plugin {
                 typeof body.selectedSummary === 'string'
                   ? body.selectedSummary
                   : undefined,
+              previewPngBase64:
+                typeof body.previewPngBase64 === 'string'
+                  ? body.previewPngBase64
+                  : undefined,
+              effort: status.effort,
+              provider: status.provider,
             })
 
             if (activeAssistantKill) {
@@ -499,20 +613,29 @@ export function playdateProjectBridge(): Plugin {
               provider: status.provider,
               mode,
               scene: sceneFile.name,
+              hasPreview: pack.hasPreview,
+              effort: status.effort,
             })
 
             const run = startAssistantRun(
               {
                 provider: status.provider,
                 mode,
-                prompt,
+                prompt: pack.prompt,
                 cwd: ROOT,
+                effort: status.effort,
+                model: status.model,
               },
               (chunk) => {
                 if (chunk.type === 'stdout') {
                   writeEvent('stdout', { text: chunk.text })
                 } else if (chunk.type === 'stderr') {
                   writeEvent('stderr', { text: chunk.text })
+                } else if (chunk.type === 'step') {
+                  writeEvent('step', {
+                    label: chunk.label,
+                    tool: chunk.tool,
+                  })
                 } else if (chunk.type === 'error') {
                   writeEvent('error', { message: chunk.message })
                 } else if (chunk.type === 'done') {

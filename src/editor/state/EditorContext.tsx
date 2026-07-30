@@ -152,6 +152,11 @@ type EditorContextValue = {
   /** Mark upcoming disk scene updates as undoable Nibble edits. */
   beginNibbleSession: (label: string) => void
   endNibbleSession: () => void
+  /**
+   * Pull latest scene from disk (if changed) as one undoable Nibble edit,
+   * then clear the session. Call when an Edit run finishes.
+   */
+  finishNibbleSession: () => Promise<boolean>
   /** True while a Nibble edit session is waiting for disk updates. */
   nibbleSessionActive: boolean
 }
@@ -829,11 +834,51 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     setNibbleSessionActive(false)
   }, [])
 
+  const applyNibbleDiskIfChanged = useCallback(async (): Promise<boolean> => {
+    const nibble = nibbleSessionRef.current
+    if (!nibble) return false
+    const name = sceneRef.current.name
+    const res = await projectClient.fetchScene(name)
+    if (res.revision === revisionRef.current) return false
+    historyRef.current.apply(
+      () => sceneRef.current,
+      (s) => {
+        setScene(s)
+        sceneRef.current = s
+      },
+      () => structuredClone(res.scene),
+      nibble.label,
+    )
+    setRevision(res.revision)
+    setDirty(false)
+    setConflict(null)
+    setDiagnostics(res.diagnostics)
+    setStatus(`Nibble updated · ${res.relativePath}`)
+    pushConsole({
+      severity: 'info',
+      message: `${nibble.label} → ${res.relativePath}`,
+    })
+    return true
+  }, [pushConsole])
+
+  const finishNibbleSession = useCallback(async () => {
+    try {
+      return await applyNibbleDiskIfChanged()
+    } catch {
+      return false
+    } finally {
+      nibbleSessionRef.current = null
+      setNibbleSessionActive(false)
+    }
+  }, [applyNibbleDiskIfChanged])
+
   // HMR subscriptions
   useEffect(() => {
     return projectClient.subscribeHot({
       onSceneChanged: async (data) => {
-        const name = (data.name as string) || sceneRef.current.name
+        const rawName = (data.name as string) || sceneRef.current.name
+        // Watcher may pass a filename; API expects scene id/name without suffix.
+        const name = rawName.replace(/\.scene\.json$/i, '').replace(/^.*\//, '')
         if (savingRef.current) return
         try {
           const res = await projectClient.fetchScene(name)
@@ -1257,6 +1302,7 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     getSceneSnapshot,
     beginNibbleSession,
     endNibbleSession,
+    finishNibbleSession,
     nibbleSessionActive,
   }
 

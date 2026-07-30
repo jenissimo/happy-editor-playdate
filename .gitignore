@@ -18,6 +18,7 @@ playdate/**/*.pdx
 
 # Visual parity artifacts
 .playdate-editor/visual/
+.playdate-editor/nibble-run/
 .playdate-editor/*.tmp
 .playdate-editor/workspace.json
 .playdate-editor/workspace.json.*.tmp
