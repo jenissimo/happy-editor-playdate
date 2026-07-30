@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sceneRoot": "playdate/scenes",
+  "sourceRoot": "playdate/Source",
+  "generatedLuaRoot": "playdate/Source/scenes",
+  "assetRoots": ["playdate/Source/images", "playdate/Source/fonts"],
+  "defaultScene": "demo-title",
+  "pdxOut": "playdate/Editor.pdx",
+  "assistant": {
+    "provider": "claude"
+  }
+}

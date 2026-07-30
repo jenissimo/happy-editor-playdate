@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://playdate-editor.local/schema/playdate-scene.schema.json",
+  "title": "Playdate Scene",
+  "description": "Canonical scene format for HappyEditor. Source of truth for layout; Lua modules are generated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "name",
+    "width",
+    "height",
+    "states",
+    "defaultState",
+    "nodes"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "width": { "const": 400 },
+    "height": { "const": 240 },
+    "states": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "defaultState": { "type": "string", "minLength": 1 },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sceneNode" }
+    }
+  },
+  "$defs": {
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "right", "top", "bottom"],
+      "properties": {
+        "left": { "type": "integer", "minimum": 0 },
+        "right": { "type": "integer", "minimum": 0 },
+        "top": { "type": "integer", "minimum": 0 },
+        "bottom": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ink": { "enum": ["black", "white"] },
+    "ditherPattern": {
+      "enum": [
+        "bayer2",
+        "bayer4",
+        "bayer8",
+        "horizontal",
+        "vertical",
+        "diagonal",
+        "screen",
+        "checker",
+        "dots"
+      ]
+    },
+    "shapeFill": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "none" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "color"],
+          "properties": {
+            "kind": { "const": "solid" },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "pattern", "color"],
+          "properties": {
+            "kind": { "const": "dither" },
+            "pattern": { "$ref": "#/$defs/ditherPattern" },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "axis", "from", "to", "color"],
+          "properties": {
+            "kind": { "const": "gradient" },
+            "axis": { "enum": ["h", "v"] },
+            "from": { "type": "number", "minimum": 0, "maximum": 1 },
+            "to": { "type": "number", "minimum": 0, "maximum": 1 },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        }
+      ]
+    },
+    "shapeStroke": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": { "kind": { "const": "none" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "thickness", "color"],
+          "properties": {
+            "kind": { "const": "solid" },
+            "thickness": { "type": "integer", "minimum": 1 },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "thickness", "gap", "color"],
+          "properties": {
+            "kind": { "const": "double" },
+            "thickness": { "type": "integer", "minimum": 1 },
+            "gap": { "type": "integer", "minimum": 1 },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "thickness", "dash", "gap", "color"],
+          "properties": {
+            "kind": { "const": "dashed" },
+            "thickness": { "type": "integer", "minimum": 1 },
+            "dash": { "type": "integer", "minimum": 1 },
+            "gap": { "type": "integer", "minimum": 1 },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "thickness", "step", "color"],
+          "properties": {
+            "kind": { "const": "ticks" },
+            "thickness": { "type": "integer", "minimum": 1 },
+            "step": { "type": "integer", "minimum": 2 },
+            "color": { "$ref": "#/$defs/ink" }
+          }
+        }
+      ]
+    },
+    "baseNode": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "type",
+        "x",
+        "y",
+        "w",
+        "h",
+        "anchor",
+        "states",
+        "visible",
+        "locked"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": ["text", "image", "panel", "frame", "shape", "group"]
+        },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "w": { "type": "number", "minimum": 1 },
+        "h": { "type": "number", "minimum": 1 },
+        "anchor": { "$ref": "#/$defs/anchor" },
+        "rotation": {
+          "type": "number",
+          "description": "Degrees clockwise around anchor/pivot. Missing = 0."
+        },
+        "states": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Empty array means visible in all states."
+        },
+        "visible": { "type": "boolean" },
+        "locked": { "type": "boolean" }
+      }
+    },
+    "textNode": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "type": "object",
+          "required": ["type", "text", "font", "align"],
+          "properties": {
+            "type": { "const": "text" },
+            "text": { "type": "string" },
+            "font": {
+              "type": "string",
+              "description": "Logical font path without extension. Empty/missing resolves to fonts/Roobert-11-Medium (not system font)."
+            },
+            "align": { "enum": ["left", "center", "right"] },
+            "valign": {
+              "enum": ["top", "middle", "bottom"],
+              "default": "top",
+              "description": "Vertical alignment inside the text box"
+            },
+            "outline": {
+              "description": "Glyph outline (8-direction rings). Primary = inner; optional outer ring further out. null/absent = off. Clipped to node box.",
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["width", "color"],
+                  "properties": {
+                    "width": {
+                      "type": "number",
+                      "minimum": 1,
+                      "default": 1,
+                      "description": "Inner outline thickness in px (rings 1..width)"
+                    },
+                    "color": { "$ref": "#/$defs/ink" },
+                    "outer": {
+                      "description": "Optional outer ring(s) beyond the inner outline. null/absent = off.",
+                      "oneOf": [
+                        { "type": "null" },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["width", "color"],
+                          "properties": {
+                            "width": {
+                              "type": "number",
+                              "minimum": 1,
+                              "default": 1,
+                              "description": "Outer outline thickness in px (rings width+1 .. width+outer.width)"
+                            },
+                            "color": { "$ref": "#/$defs/ink" }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "shadow": {
+              "description": "Glyph drop shadow. null/absent = off. Clipped to node box.",
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["x", "y", "color"],
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "default": 1,
+                      "description": "Horizontal offset in px"
+                    },
+                    "y": {
+                      "type": "number",
+                      "default": 1,
+                      "description": "Vertical offset in px"
+                    },
+                    "color": { "$ref": "#/$defs/ink" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "imageNode": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "type": "object",
+          "required": ["type", "asset"],
+          "properties": {
+            "type": { "const": "image" },
+            "asset": {
+              "type": "string",
+              "description": "Logical Playdate image or imagetable path without extension"
+            },
+            "fps": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Imagetable playback rate. 0 / omitted = static frame"
+            },
+            "loop": {
+              "type": "boolean",
+              "description": "Loop imagetable animation (default true)"
+            },
+            "frameStart": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based inclusive start frame"
+            },
+            "frameEnd": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based inclusive end frame (default = table length)"
+            },
+            "frame": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Static 1-based frame when fps is 0"
+            }
+          }
+        }
+      ]
+    },
+    "panelNode": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "type": "object",
+          "required": ["type", "asset", "slice"],
+          "properties": {
+            "type": { "const": "panel" },
+            "asset": {
+              "type": "string",
+              "description": "Logical base path; file on disk is asset-slice-L-R-T-B.png"
+            },
+            "slice": { "$ref": "#/$defs/slice" }
+          }
+        }
+      ]
+    },
+    "frameNode": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "type": "object",
+          "required": ["type", "style", "thickness"],
+          "properties": {
+            "type": { "const": "frame" },
+            "style": { "enum": ["line", "double", "ticks"] },
+            "thickness": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "shapeNode": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "type": "object",
+          "required": ["type", "cornerRadius", "fill", "stroke"],
+          "properties": {
+            "type": { "const": "shape" },
+            "cornerRadius": { "type": "integer", "minimum": 0 },
+            "fill": { "$ref": "#/$defs/shapeFill" },
+            "stroke": { "$ref": "#/$defs/shapeStroke" }
+          }
+        }
+      ]
+    },
+    "groupNode": {
+      "allOf": [
+        { "$ref": "#/$defs/baseNode" },
+        {
+          "type": "object",
+          "required": ["type", "children"],
+          "properties": {
+            "type": { "const": "group" },
+            "children": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/sceneNode" }
+            }
+          }
+        }
+      ]
+    },
+    "sceneNode": {
+      "oneOf": [
+        { "$ref": "#/$defs/textNode" },
+        { "$ref": "#/$defs/imageNode" },
+        { "$ref": "#/$defs/panelNode" },
+        { "$ref": "#/$defs/frameNode" },
+        { "$ref": "#/$defs/shapeNode" },
+        { "$ref": "#/$defs/groupNode" }
+      ]
+    }
+  }
+}

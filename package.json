@@ -1,0 +1,41 @@
+{
+  "name": "happy-editor-playdate",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:playdate": "bun scripts/build-playdate.ts",
+    "gen:assets": "bun scripts/gen-ui-assets.ts",
+    "scenes:validate": "bun scripts/validate-scenes.ts",
+    "scenes:generate": "bun scripts/generate-scenes.ts",
+    "assets:index": "bun -e \"import { indexPlaydateAssets } from './src/core/assets/indexAssets.ts'; console.log(JSON.stringify(indexPlaydateAssets(), null, 2))\"",
+    "project:info": "bun -e \"import { getProjectPaths } from './src/core/project/paths.ts'; const p = getProjectPaths(); console.log(JSON.stringify({ root: p.root, rootSource: p.rootSource, packageRoot: p.packageRoot, config: p.config, scenesDir: p.scenesDir, sourceDir: p.sourceDir, luaScenesDir: p.luaScenesDir, editorDir: p.editorDir, pdxOut: p.pdxOut }, null, 2))\"",
+    "lint": "oxlint",
+    "test": "bun test",
+    "test:visual": "bun scripts/visual-parity.ts",
+    "test:visual:all": "bun scripts/visual-parity.ts --all",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "ajv": "^8.20.0",
+    "dockview-react": "^7.0.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.3",
+    "@types/bun": "^1.3.14",
+    "@types/node": "^26.1.2",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "pngjs": "^7.0.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sceneRoot": "scenes",
+  "sourceRoot": "Source",
+  "generatedLuaRoot": "Source/scenes",
+  "assetRoots": ["Source/images", "Source/fonts"],
+  "defaultScene": "menu",
+  "pdxOut": "Editor.pdx",
+  "assistant": {
+    "provider": "cursor"
+  }
+}

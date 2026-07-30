@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HappyEditor</title>
+  </head>
+  <body>
+    <!-- Remap pure B&W framebuffer → Simulator LCD paper/ink on display only. -->
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="0"
+      height="0"
+      aria-hidden="true"
+      style="position: absolute; overflow: hidden"
+    >
+      <defs>
+        <filter id="pd-lcd-tint" color-interpolation-filters="sRGB">
+          <!-- 0 → PD_LCD_FG #312e28 · 1 → PD_LCD_BG #d6d3cb -->
+          <feComponentTransfer>
+            <feFuncR type="table" tableValues="0.192157 0.839216" />
+            <feFuncG type="table" tableValues="0.180392 0.827451" />
+            <feFuncB type="table" tableValues="0.156863 0.796078" />
+          </feComponentTransfer>
+        </filter>
+      </defs>
+    </svg>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

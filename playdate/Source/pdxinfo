@@ -1,0 +1,7 @@
+name=Editor Fixture
+author=jenissimo
+description=Test harness for playdate-editor scene export
+bundleID=com.jenissimo.playdate-editor.fixture
+version=0.1.0
+buildNumber=1
+imagePath=

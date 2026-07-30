@@ -1,0 +1,598 @@
+{
+  "version": 1,
+  "id": "demo-gallery",
+  "name": "demo-gallery",
+  "width": 400,
+  "height": 240,
+  "states": [
+    "default"
+  ],
+  "defaultState": "default",
+  "nodes": [
+    {
+      "id": "header",
+      "name": "Header",
+      "type": "shape",
+      "x": 0,
+      "y": 0,
+      "w": 400,
+      "h": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": true,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "dither",
+        "pattern": "screen",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "header-rule",
+      "name": "Header Rule",
+      "type": "shape",
+      "x": 0,
+      "y": 31,
+      "w": 400,
+      "h": 1,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": true,
+      "cornerRadius": 0,
+      "fill": {
+        "kind": "solid",
+        "color": "black"
+      },
+      "stroke": {
+        "kind": "none"
+      }
+    },
+    {
+      "id": "header-title",
+      "name": "Header Title",
+      "type": "text",
+      "x": 16,
+      "y": 0,
+      "w": 228,
+      "h": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "text": "NODE GALLERY",
+      "font": "fonts/Roobert-11-Medium",
+      "align": "left",
+      "valign": "middle",
+      "outline": {
+        "width": 1,
+        "color": "white"
+      }
+    },
+    {
+      "id": "header-meta",
+      "name": "Header Meta",
+      "type": "text",
+      "x": 244,
+      "y": 0,
+      "w": 140,
+      "h": 32,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "text": "HappyEditor",
+      "font": "fonts/Roobert-10-Bold",
+      "align": "right",
+      "valign": "middle",
+      "outline": {
+        "width": 1,
+        "color": "white"
+      }
+    },
+    {
+      "id": "col-shapes",
+      "name": "Shapes Column",
+      "type": "group",
+      "x": 8,
+      "y": 40,
+      "w": 124,
+      "h": 192,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "children": [
+        {
+          "id": "s-label",
+          "name": "Shapes Label",
+          "type": "text",
+          "x": 8,
+          "y": 40,
+          "w": 124,
+          "h": 14,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "SHAPES",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "left"
+        },
+        {
+          "id": "s-solid",
+          "name": "Solid",
+          "type": "shape",
+          "x": 8,
+          "y": 58,
+          "w": 56,
+          "h": 36,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "cornerRadius": 6,
+          "fill": {
+            "kind": "solid",
+            "color": "black"
+          },
+          "stroke": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "s-dither",
+          "name": "Dither",
+          "type": "shape",
+          "x": 72,
+          "y": 58,
+          "w": 56,
+          "h": 36,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "cornerRadius": 6,
+          "fill": {
+            "kind": "dither",
+            "pattern": "bayer8",
+            "color": "black"
+          },
+          "stroke": {
+            "kind": "solid",
+            "thickness": 1,
+            "color": "black"
+          }
+        },
+        {
+          "id": "s-grad",
+          "name": "Gradient",
+          "type": "shape",
+          "x": 8,
+          "y": 102,
+          "w": 120,
+          "h": 28,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "cornerRadius": 0,
+          "fill": {
+            "kind": "gradient",
+            "axis": "h",
+            "from": 0,
+            "to": 1,
+            "color": "black"
+          },
+          "stroke": {
+            "kind": "none"
+          }
+        },
+        {
+          "id": "s-stroke",
+          "name": "Strokes",
+          "type": "shape",
+          "x": 8,
+          "y": 140,
+          "w": 120,
+          "h": 40,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "cornerRadius": 4,
+          "fill": {
+            "kind": "none"
+          },
+          "stroke": {
+            "kind": "dashed",
+            "thickness": 2,
+            "dash": 6,
+            "gap": 3,
+            "color": "black"
+          }
+        },
+        {
+          "id": "s-ticks",
+          "name": "Ticks Frame",
+          "type": "frame",
+          "x": 8,
+          "y": 190,
+          "w": 120,
+          "h": 34,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "style": "ticks",
+          "thickness": 1
+        }
+      ]
+    },
+    {
+      "id": "col-text",
+      "name": "Text Column",
+      "type": "group",
+      "x": 144,
+      "y": 40,
+      "w": 120,
+      "h": 192,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "children": [
+        {
+          "id": "t-label",
+          "name": "Text Label",
+          "type": "text",
+          "x": 144,
+          "y": 40,
+          "w": 120,
+          "h": 14,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "TYPE",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "left"
+        },
+        {
+          "id": "t-medium",
+          "name": "Medium",
+          "type": "text",
+          "x": 144,
+          "y": 60,
+          "w": 120,
+          "h": 20,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "Roobert 11",
+          "font": "fonts/Roobert-11-Medium",
+          "align": "left"
+        },
+        {
+          "id": "t-bold",
+          "name": "Bold",
+          "type": "text",
+          "x": 144,
+          "y": 84,
+          "w": 120,
+          "h": 16,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "Bold 10",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "left"
+        },
+        {
+          "id": "t-mono",
+          "name": "Mono",
+          "type": "text",
+          "x": 144,
+          "y": 104,
+          "w": 120,
+          "h": 14,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "mono condensed",
+          "font": "fonts/Roobert-11-Mono-Condensed",
+          "align": "left"
+        },
+        {
+          "id": "t-fx",
+          "name": "Effects",
+          "type": "text",
+          "x": 144,
+          "y": 132,
+          "w": 120,
+          "h": 28,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "outline+",
+          "font": "fonts/Roobert-11-Medium",
+          "align": "center",
+          "valign": "middle",
+          "outline": {
+            "width": 1,
+            "color": "white"
+          },
+          "shadow": {
+            "x": 2,
+            "y": 2,
+            "color": "black"
+          }
+        },
+        {
+          "id": "t-box",
+          "name": "Align Box",
+          "type": "shape",
+          "x": 144,
+          "y": 172,
+          "w": 120,
+          "h": 48,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "cornerRadius": 0,
+          "fill": {
+            "kind": "dither",
+            "pattern": "dots",
+            "color": "black"
+          },
+          "stroke": {
+            "kind": "solid",
+            "thickness": 1,
+            "color": "black"
+          }
+        },
+        {
+          "id": "t-center",
+          "name": "Centered",
+          "type": "text",
+          "x": 144,
+          "y": 172,
+          "w": 120,
+          "h": 48,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "middle",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "center",
+          "valign": "middle"
+        }
+      ]
+    },
+    {
+      "id": "col-assets",
+      "name": "Assets Column",
+      "type": "group",
+      "x": 276,
+      "y": 40,
+      "w": 116,
+      "h": 192,
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "states": [],
+      "visible": true,
+      "locked": false,
+      "children": [
+        {
+          "id": "a-label",
+          "name": "Assets Label",
+          "type": "text",
+          "x": 276,
+          "y": 40,
+          "w": 116,
+          "h": 14,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "ASSETS",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "left"
+        },
+        {
+          "id": "a-panel",
+          "name": "9-slice",
+          "type": "panel",
+          "x": 276,
+          "y": 58,
+          "w": 116,
+          "h": 64,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "asset": "images/panel",
+          "slice": {
+            "left": 8,
+            "right": 8,
+            "top": 8,
+            "bottom": 8
+          }
+        },
+        {
+          "id": "a-panel-t",
+          "name": "9-slice Label",
+          "type": "text",
+          "x": 276,
+          "y": 58,
+          "w": 116,
+          "h": 64,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "panel\n9-slice",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "center",
+          "valign": "middle"
+        },
+        {
+          "id": "a-paw",
+          "name": "Paw",
+          "type": "image",
+          "x": 284,
+          "y": 132,
+          "w": 40,
+          "h": 44,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "asset": "images/paw_print"
+        },
+        {
+          "id": "a-icon",
+          "name": "Icon",
+          "type": "image",
+          "x": 340,
+          "y": 140,
+          "w": 32,
+          "h": 32,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "asset": "images/icon",
+          "rotation": -8
+        },
+        {
+          "id": "a-btn",
+          "name": "Button",
+          "type": "panel",
+          "x": 276,
+          "y": 192,
+          "w": 116,
+          "h": 28,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "asset": "images/button",
+          "slice": {
+            "left": 4,
+            "right": 4,
+            "top": 4,
+            "bottom": 4
+          }
+        },
+        {
+          "id": "a-btn-t",
+          "name": "Button Label",
+          "type": "text",
+          "x": 276,
+          "y": 192,
+          "w": 116,
+          "h": 28,
+          "anchor": {
+            "x": 0,
+            "y": 0
+          },
+          "states": [],
+          "visible": true,
+          "locked": false,
+          "text": "button",
+          "font": "fonts/Roobert-10-Bold",
+          "align": "center",
+          "valign": "middle"
+        }
+      ]
+    }
+  ]
+}
