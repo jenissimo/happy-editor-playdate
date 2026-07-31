@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   measureGlyphRun,
+  normalizeTextScale,
   parsePlaydateFnt,
   type LoadedPlaydateFont,
 } from './playdateFont'
@@ -34,5 +35,15 @@ describe('measureGlyphRun', () => {
     } satisfies LoadedPlaydateFont
     // A(5) + tracking(1) + kern(-1) + B(6) = 11
     expect(measureGlyphRun(font, 'AB')).toBe(11)
+  })
+})
+
+describe('normalizeTextScale', () => {
+  test('defaults and clamps to integer 1..8', () => {
+    expect(normalizeTextScale(undefined)).toBe(1)
+    expect(normalizeTextScale(null)).toBe(1)
+    expect(normalizeTextScale(2.9)).toBe(2)
+    expect(normalizeTextScale(0)).toBe(1)
+    expect(normalizeTextScale(99)).toBe(8)
   })
 })

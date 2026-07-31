@@ -131,6 +131,7 @@ function NodeContent({
           color={node.color ?? 'black'}
           outline={node.outline}
           shadow={node.shadow}
+          scale={node.scale}
         />
       )
 

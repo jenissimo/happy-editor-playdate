@@ -222,6 +222,13 @@
               "default": "top",
               "description": "Vertical alignment inside the text box"
             },
+            "scale": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8,
+              "default": 1,
+              "description": "Integer nearest-neighbor glyph scale. Omitted / 1 = native .fnt size. Layout uses floor(w/scale)×floor(h/scale) font pixels, then upscales."
+            },
             "color": {
               "$ref": "#/$defs/ink",
               "default": "black",

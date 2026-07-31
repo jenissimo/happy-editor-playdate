@@ -218,6 +218,21 @@ export function ContextOptionsBar() {
               onChange={(font) => patch({ font }, 'Edit font')}
             />
           </div>
+          <NumericField
+            label="×"
+            value={selected.scale ?? 1}
+            min={1}
+            max={8}
+            step={1}
+            disabled={locked}
+            onChange={(raw) => {
+              const scale = Math.max(1, Math.min(8, Math.floor(raw)))
+              patch(
+                { scale: scale === 1 ? undefined : scale },
+                'Text scale',
+              )
+            }}
+          />
           <ChoiceTiles
             label="Ink"
             value={selected.color ?? 'black'}

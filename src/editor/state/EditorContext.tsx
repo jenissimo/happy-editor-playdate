@@ -28,6 +28,10 @@ import {
   type DropPlace,
 } from './nodeTree'
 import {
+  cloneSelectionForClipboard,
+  materializePasteNodes,
+} from './nodeClipboard'
+import {
   addSceneState as addSceneStatePure,
   cycleSceneState,
   removeSceneState as removeSceneStatePure,
@@ -135,6 +139,10 @@ type EditorContextValue = {
   addFromAsset: (asset: IndexedAsset, at?: { x: number; y: number }) => void
   deleteSelected: () => void
   duplicateSelected: () => void
+  copySelected: () => void
+  pasteClipboard: () => void
+  /** True when the in-memory node clipboard has contents. */
+  canPaste: boolean
   reorder: (fromId: string, toId: string, place: DropPlace) => void
   groupSelected: () => void
   save: () => Promise<void>
@@ -483,6 +491,36 @@ export function EditorProvider({ children }: { children: ReactNode }) {
       return { ...s, nodes: [...s.nodes, ...copies] }
     })
   }, [mutate, selectedIds])
+
+  const clipboardRef = useRef<SceneNode[]>([])
+  const [canPaste, setCanPaste] = useState(false)
+
+  const copySelected = useCallback(() => {
+    if (selectedIds.length === 0) return
+    const clipped = cloneSelectionForClipboard(scene.nodes, selectedIds)
+    if (clipped.length === 0) return
+    clipboardRef.current = clipped
+    setCanPaste(true)
+    try {
+      void navigator.clipboard?.writeText(
+        JSON.stringify({
+          version: 1,
+          kind: 'happy-editor/nodes',
+          nodes: clipped,
+        }),
+      )
+    } catch {
+      /* in-memory clipboard is enough */
+    }
+  }, [scene.nodes, selectedIds])
+
+  const pasteClipboard = useCallback(() => {
+    const source = clipboardRef.current
+    if (source.length === 0) return
+    const copies = materializePasteNodes(source)
+    mutate('Paste', (s) => ({ ...s, nodes: [...s.nodes, ...copies] }))
+    setSelectedIds(copies.map((c) => c.id))
+  }, [mutate])
 
   const reorder = useCallback(
     (fromId: string, toId: string, place: DropPlace) => {
@@ -989,6 +1027,20 @@ export function EditorProvider({ children }: { children: ReactNode }) {
         run: duplicateSelected,
       },
       {
+        id: 'edit.copy',
+        title: 'Copy',
+        shortcut: 'Mod+C',
+        enabled: () => selectedIds.length > 0,
+        run: copySelected,
+      },
+      {
+        id: 'edit.paste',
+        title: 'Paste',
+        shortcut: 'Mod+V',
+        enabled: () => clipboardRef.current.length > 0,
+        run: pasteClipboard,
+      },
+      {
         id: 'view.toggleGrid',
         title: 'Toggle Grid',
         shortcut: 'Mod+G',
@@ -1143,6 +1195,8 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     redo,
     deleteSelected,
     duplicateSelected,
+    copySelected,
+    pasteClipboard,
     addNode,
     groupSelected,
     selectedIds,
@@ -1286,6 +1340,9 @@ export function EditorProvider({ children }: { children: ReactNode }) {
     addFromAsset,
     deleteSelected,
     duplicateSelected,
+    copySelected,
+    pasteClipboard,
+    canPaste,
     reorder,
     groupSelected,
     save,

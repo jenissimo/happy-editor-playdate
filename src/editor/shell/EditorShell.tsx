@@ -543,6 +543,22 @@ export function EditorShell() {
             <button
               type="button"
               disabled={editor.selectedIds.length === 0}
+              onClick={editor.copySelected}
+            >
+              Copy
+              <kbd>Mod+C</kbd>
+            </button>
+            <button
+              type="button"
+              disabled={!editor.canPaste}
+              onClick={editor.pasteClipboard}
+            >
+              Paste
+              <kbd>Mod+V</kbd>
+            </button>
+            <button
+              type="button"
+              disabled={editor.selectedIds.length === 0}
               onClick={editor.duplicateSelected}
             >
               Duplicate

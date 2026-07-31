@@ -587,96 +587,121 @@ local function drawNodeContent(node, x, y)
         end
         local text = node.text or ""
 
-        -- Inset so outline/shadow rings aren't clipped on left/top-aligned edges.
-        local pad = 0
-        local outline = node.outline
-        if outline then
-            local ow = outline.width or 1
-            if ow < 1 then ow = 1 end
-            pad = ow
-            local outer = outline.outer
-            if outer then
-                local oow = outer.width or 1
-                if oow < 1 then oow = 1 end
-                pad = pad + oow
-            end
-        end
-        local shadow = node.shadow
-        if shadow then
-            local sx = math.abs(shadow.x or 1)
-            local sy = math.abs(shadow.y or 1)
-            if sx > pad then pad = sx end
-            if sy > pad then pad = sy end
-        end
+        -- Integer nearest-neighbor scale (1–8). Layout in font pixels, then upscale.
+        local scale = math.floor(node.scale or 1)
+        if scale < 1 then scale = 1 end
+        if scale > 8 then scale = 8 end
 
-        local boxX, boxY, boxW, boxH = x, y, node.w, node.h
-        local tx, ty, tw, th = boxX, boxY, boxW, boxH
-        if pad > 0 and tw > pad * 2 and th > pad * 2 then
-            tx = boxX + pad
-            ty = boxY + pad
-            tw = boxW - pad * 2
-            th = boxH - pad * 2
-        end
-
-        local _, textH = gfx.getTextSizeForMaxWidth(text, tw)
-        local oy = 0
-        local valign = node.valign or "top"
-        if valign == "middle" then
-            oy = math.floor((th - textH) / 2 + 0.5)
-        elseif valign == "bottom" then
-            oy = th - textH
-        end
-
-        local function drawTextInk(ox, oyOff, ink)
-            if ink == "white" then
-                gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
-            else
-                gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
-            end
-            gfx.drawTextInRect(
-                text,
-                tx + ox,
-                ty + oy + oyOff,
-                tw,
-                math.max(th, textH),
-                nil,
-                nil,
-                align
-            )
-            gfx.setImageDrawMode(gfx.kDrawModeCopy)
-        end
-
-        -- Clip so middle/bottom / outline / shadow stay inside the box.
-        gfx.setClipRect(boxX, boxY, boxW, boxH)
-
-        -- Draw order: shadow → outer outline → inner outline → fill.
-        if shadow then
-            drawTextInk(shadow.x or 1, shadow.y or 1, shadow.color or "black")
-        end
-
-        if outline then
-            local ow = outline.width or 1
-            if ow < 1 then ow = 1 end
-            local function drawOutlineRing(fromR, toR, ink)
-                for r = fromR, toR do
-                    for di = 1, #OUTLINE_DIRS do
-                        local d = OUTLINE_DIRS[di]
-                        drawTextInk(d[1] * r, d[2] * r, ink)
-                    end
+        local function drawTextAt(boxX, boxY, boxW, boxH)
+            -- Inset so outline/shadow rings aren't clipped on left/top-aligned edges.
+            local pad = 0
+            local outline = node.outline
+            if outline then
+                local ow = outline.width or 1
+                if ow < 1 then ow = 1 end
+                pad = ow
+                local outer = outline.outer
+                if outer then
+                    local oow = outer.width or 1
+                    if oow < 1 then oow = 1 end
+                    pad = pad + oow
                 end
             end
-            -- Outer first, then inner (white-inside / black-outside stack).
-            local outer = outline.outer
-            if outer then
-                local oow = outer.width or 1
-                if oow < 1 then oow = 1 end
-                drawOutlineRing(ow + 1, ow + oow, outer.color or "black")
+            local shadow = node.shadow
+            if shadow then
+                local sx = math.abs(shadow.x or 1)
+                local sy = math.abs(shadow.y or 1)
+                if sx > pad then pad = sx end
+                if sy > pad then pad = sy end
             end
-            drawOutlineRing(1, ow, outline.color or "black")
+
+            local tx, ty, tw, th = boxX, boxY, boxW, boxH
+            if pad > 0 and tw > pad * 2 and th > pad * 2 then
+                tx = boxX + pad
+                ty = boxY + pad
+                tw = boxW - pad * 2
+                th = boxH - pad * 2
+            end
+
+            local _, textH = gfx.getTextSizeForMaxWidth(text, tw)
+            local oy = 0
+            local valign = node.valign or "top"
+            if valign == "middle" then
+                oy = math.floor((th - textH) / 2 + 0.5)
+            elseif valign == "bottom" then
+                oy = th - textH
+            end
+
+            local function drawTextInk(ox, oyOff, ink)
+                if ink == "white" then
+                    gfx.setImageDrawMode(gfx.kDrawModeFillWhite)
+                else
+                    gfx.setImageDrawMode(gfx.kDrawModeFillBlack)
+                end
+                gfx.drawTextInRect(
+                    text,
+                    tx + ox,
+                    ty + oy + oyOff,
+                    tw,
+                    math.max(th, textH),
+                    nil,
+                    nil,
+                    align
+                )
+                gfx.setImageDrawMode(gfx.kDrawModeCopy)
+            end
+
+            -- Clip so middle/bottom / outline / shadow stay inside the box.
+            gfx.setClipRect(boxX, boxY, boxW, boxH)
+
+            -- Draw order: shadow → outer outline → inner outline → fill.
+            if shadow then
+                drawTextInk(shadow.x or 1, shadow.y or 1, shadow.color or "black")
+            end
+
+            if outline then
+                local ow = outline.width or 1
+                if ow < 1 then ow = 1 end
+                local function drawOutlineRing(fromR, toR, ink)
+                    for r = fromR, toR do
+                        for di = 1, #OUTLINE_DIRS do
+                            local d = OUTLINE_DIRS[di]
+                            drawTextInk(d[1] * r, d[2] * r, ink)
+                        end
+                    end
+                end
+                -- Outer first, then inner (white-inside / black-outside stack).
+                local outer = outline.outer
+                if outer then
+                    local oow = outer.width or 1
+                    if oow < 1 then oow = 1 end
+                    drawOutlineRing(ow + 1, ow + oow, outer.color or "black")
+                end
+                drawOutlineRing(1, ow, outline.color or "black")
+            end
+
+            drawTextInk(0, 0, node.color or "black")
+            gfx.clearClipRect()
         end
 
-        drawTextInk(0, 0, node.color or "black")
-        gfx.clearClipRect()
+        if scale == 1 then
+            drawTextAt(x, y, node.w, node.h)
+        else
+            local lw = math.max(1, math.floor(node.w / scale))
+            local lh = math.max(1, math.floor(node.h / scale))
+            local img = gfx.image.new(lw, lh, gfx.kColorClear)
+            if not img then
+                drawTextAt(x, y, node.w, node.h)
+                return
+            end
+            gfx.pushContext(img)
+            gfx.clear(gfx.kColorClear)
+            drawTextAt(0, 0, lw, lh)
+            gfx.popContext()
+            gfx.setClipRect(x, y, node.w, node.h)
+            img:drawScaled(x, y, scale, scale)
+            gfx.clearClipRect()
+        end
     end
 end
 

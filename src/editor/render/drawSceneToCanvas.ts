@@ -2,7 +2,7 @@ import { SCREEN_H, SCREEN_W } from '../../core/constants'
 import type { IndexedAsset } from '../../core/assets/types'
 import type { ImageTint, Scene, SceneNode } from '../../core/scene/types'
 import {
-  drawBitmapText,
+  drawBitmapTextScaled,
   loadPlaydateFont,
   resolveFontAssets,
   resolveFontPath,
@@ -329,7 +329,7 @@ async function drawNodeContent(
     case 'text': {
       const font = await getFont(node.font, assets)
       if (font) {
-        drawBitmapText(ctx, font, {
+        drawBitmapTextScaled(ctx, font, {
           text: node.text,
           align: node.align,
           valign: node.valign ?? 'top',
@@ -340,6 +340,7 @@ async function drawNodeContent(
           color: node.color ?? 'black',
           outline: node.outline,
           shadow: node.shadow,
+          scale: node.scale,
         })
       }
       // No monospace/OS fallback — empty box if font cannot load.

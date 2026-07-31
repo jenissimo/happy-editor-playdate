@@ -97,6 +97,9 @@ export function ScenePanel() {
     patchNode,
     deleteSelected,
     duplicateSelected,
+    copySelected,
+    pasteClipboard,
+    canPaste,
     groupSelected,
   } = editor
 
@@ -262,6 +265,19 @@ export function ScenePanel() {
       if (focus) {
         items.push(
           ctxItem({
+            id: 'copy',
+            label: 'Copy',
+            shortcut: '⌘C',
+            run: () => copySelected(),
+          }),
+          ctxItem({
+            id: 'paste',
+            label: 'Paste',
+            shortcut: '⌘V',
+            disabled: !canPaste,
+            run: () => pasteClipboard(),
+          }),
+          ctxItem({
             id: 'duplicate',
             label: 'Duplicate',
             shortcut: '⌘D',
@@ -334,10 +350,13 @@ export function ScenePanel() {
     },
     [
       addNode,
+      canPaste,
       commands,
+      copySelected,
       deleteSelected,
       duplicateSelected,
       groupSelected,
+      pasteClipboard,
       patchNode,
       scene.nodes,
       selectOne,

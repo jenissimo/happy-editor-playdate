@@ -8,8 +8,9 @@ import type {
   TextVAlign,
 } from '../../core/scene/types'
 import {
-  drawBitmapText,
+  drawBitmapTextScaled,
   loadPlaydateFont,
+  normalizeTextScale,
   resolveFontAssets,
   resolveFontPath,
 } from './playdateFont'
@@ -26,6 +27,8 @@ type Props = {
   color?: Ink
   outline?: TextOutline | null
   shadow?: TextShadow | null
+  /** Integer nearest-neighbor scale (1–8). */
+  scale?: number
 }
 
 /** Scene/Game text rendered from a Playdate .fnt + glyph atlas. */
@@ -41,8 +44,10 @@ export function BitmapText({
   color = 'black',
   outline = null,
   shadow = null,
+  scale,
 }: Props) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const textScale = normalizeTextScale(scale)
 
   useEffect(() => {
     const canvas = ref.current
@@ -71,7 +76,7 @@ export function BitmapText({
       const cctx = c.getContext('2d')
       if (!cctx) return
       cctx.clearRect(0, 0, w, h)
-      drawBitmapText(cctx, font, {
+      drawBitmapTextScaled(cctx, font, {
         text,
         align,
         valign,
@@ -80,13 +85,26 @@ export function BitmapText({
         color,
         outline,
         shadow,
+        scale: textScale,
       })
     })
 
     return () => {
       cancelled = true
     }
-  }, [text, fontPath, align, valign, width, height, assets, color, outline, shadow])
+  }, [
+    text,
+    fontPath,
+    align,
+    valign,
+    width,
+    height,
+    assets,
+    color,
+    outline,
+    shadow,
+    textScale,
+  ])
 
   return (
     <canvas

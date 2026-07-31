@@ -104,11 +104,17 @@ system / monospace font. The path must match the on-disk stem
 (e.g. `fonts/PixelOperatorSC-Bold-17/PixelOperatorSC-Bold-17`) so it lines up
 with the companion `*-table-W-H.png` and `gfx.font.new(...)`.
 
+Playdate fonts are bitmap: there is no freeform point size. To make a face
+look larger, pick a bigger `.fnt` **or** set integer **`scale`** (nearest-
+neighbor). Prefer width/height that are multiples of `scale` so the upscaled
+bitmap fills the box cleanly.
+
 Optional glyph fill + layer-style effects (effects are clipped to the text
 box; leave padding so they are not cut off):
 
 | Field | Meaning |
 |---|---|
+| `scale` | Integer nearest-neighbor glyph scale `1..8`. Omitted → `1` (native `.fnt` size). Layout uses `floor(w/scale)×floor(h/scale)` font pixels, then upscales; outline/shadow offsets scale with the glyphs |
 | `color` | Glyph fill ink: `black` \| `white`. Omitted → `black`. Needed for inverted chips / selected rows |
 | `outline` | `{ width, color, outer? }` — 8-direction glyph rings. Primary is the **inner** ring (`width` default `1`). Optional `outer: { width, color }` draws further out (rings `width+1 .. width+outer.width`). Classic readable UI: white inner + black outer. `null` / absent = off |
 | `shadow` | `{ x, y, color }` — single offset drop shadow (defaults `1,1`). `null` / absent = off |

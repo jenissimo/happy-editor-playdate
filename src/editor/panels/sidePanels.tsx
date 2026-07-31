@@ -53,6 +53,9 @@ export function HierarchyPanel() {
     patchNode,
     deleteSelected,
     duplicateSelected,
+    copySelected,
+    pasteClipboard,
+    canPaste,
     reorder,
     addNode,
     groupSelected,
@@ -120,6 +123,19 @@ export function HierarchyPanel() {
     const n = rows.find((r) => r.node.id === nodeId)?.node
     if (!n) return
     const items: ContextMenuItem[] = [
+      ctxItem({
+        id: 'copy',
+        label: 'Copy',
+        shortcut: '⌘C',
+        run: () => copySelected(),
+      }),
+      ctxItem({
+        id: 'paste',
+        label: 'Paste',
+        shortcut: '⌘V',
+        disabled: !canPaste,
+        run: () => pasteClipboard(),
+      }),
       ctxItem({
         id: 'dup',
         label: 'Duplicate',
@@ -770,6 +786,23 @@ export function InspectorPanel() {
             disabled={locked}
             onChange={(font) => patchNode(selected.id, { font }, 'Edit font')}
           />
+          <NumericField
+            label="Scale"
+            value={selected.scale ?? 1}
+            min={1}
+            max={8}
+            step={1}
+            disabled={locked}
+            onChange={(raw) => {
+              const scale = Math.max(1, Math.min(8, Math.floor(raw)))
+              patchNode(
+                selected.id,
+                { scale: scale === 1 ? undefined : scale },
+                'Text scale',
+              )
+            }}
+          />
+          <p className="hint">Integer nearest-neighbor (1–8). Prefer W/H multiples of scale.</p>
           <ChoiceTiles
             label="Align"
             value={selected.align}

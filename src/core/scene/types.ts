@@ -63,6 +63,12 @@ export type TextNode = BaseNode & {
   align: TextAlign
   /** Vertical alignment within the text box. Omitted → top. */
   valign?: TextVAlign
+  /**
+   * Integer nearest-neighbor scale for glyphs + effects (1–8).
+   * Omitted / 1 = native .fnt size. Not a freeform point size — bitmap fonts
+   * stay crisp by laying out in floor(w/scale)×floor(h/scale) then upscaling.
+   */
+  scale?: number
   /** Glyph fill ink. Omitted → black. */
   color?: Ink
   /** Layer-style outline around glyphs (optional outer ring). Drawn after shadow, before fill. */

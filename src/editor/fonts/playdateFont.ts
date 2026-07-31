@@ -341,6 +341,33 @@ export type DrawBitmapTextOpts = {
   fillStyle?: string
   outline?: TextOutline | null
   shadow?: TextShadow | null
+  /**
+   * Integer nearest-neighbor glyph scale. Omitted / 1 = native .fnt size.
+   * Layout uses floor(w/scale)×floor(h/scale) font pixels, then upscales.
+   */
+  scale?: number
+}
+
+/** Clamp text node scale to a crisp integer in 1..8. */
+export function normalizeTextScale(scale?: number | null): number {
+  if (scale == null || !Number.isFinite(scale)) return 1
+  return Math.max(1, Math.min(8, Math.floor(scale)))
+}
+
+function makeScratchCanvas(w: number, h: number): HTMLCanvasElement | OffscreenCanvas | null {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    return new OffscreenCanvas(w, h)
+  }
+  const doc = (
+    globalThis as unknown as {
+      document?: { createElement: (t: string) => HTMLCanvasElement }
+    }
+  ).document
+  if (!doc) return null
+  const c = doc.createElement('canvas')
+  c.width = w
+  c.height = h
+  return c
 }
 
 /** Pixels reserved so outline/shadow rings fit inside the text box. */
@@ -612,6 +639,63 @@ export function drawBitmapText(
     css: fillCss,
   })
 
+  ctx.restore()
+}
+
+/**
+ * Draw text with optional integer nearest-neighbor scale.
+ * `scale` 1 (default) is identical to {@link drawBitmapText}.
+ */
+export function drawBitmapTextScaled(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  font: LoadedPlaydateFont,
+  opts: DrawBitmapTextOpts,
+): void {
+  const s = normalizeTextScale(opts.scale)
+  if (s === 1) {
+    drawBitmapText(ctx, font, opts)
+    return
+  }
+
+  const boxX = opts.x ?? 0
+  const boxY = opts.y ?? 0
+  const boxW = opts.width
+  const boxH = opts.height
+  const lw = Math.max(1, Math.floor(boxW / s))
+  const lh = Math.max(1, Math.floor(boxH / s))
+  const off = makeScratchCanvas(lw, lh)
+  if (!off) {
+    drawBitmapText(ctx, font, opts)
+    return
+  }
+  if ('width' in off) {
+    off.width = lw
+    off.height = lh
+  }
+  const octx = off.getContext('2d') as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D
+    | null
+  if (!octx) {
+    drawBitmapText(ctx, font, opts)
+    return
+  }
+  octx.imageSmoothingEnabled = false
+  drawBitmapText(octx, font, {
+    ...opts,
+    x: 0,
+    y: 0,
+    width: lw,
+    height: lh,
+    scale: undefined,
+  })
+
+  ctx.save()
+  ctx.imageSmoothingEnabled = false
+  ctx.beginPath()
+  ctx.rect(boxX, boxY, boxW, boxH)
+  ctx.clip()
+  ctx.drawImage(off as CanvasImageSource, 0, 0, lw, lh, boxX, boxY, lw * s, lh * s)
   ctx.restore()
 }
 
