@@ -239,6 +239,33 @@ export function playdateProjectBridge(): Plugin {
   let watchers: FSWatcher[] = []
   let serverRef: ViteDevServer | null = null
   let debounce: ReturnType<typeof setTimeout> | null = null
+  let watcherRetry: ReturnType<typeof setTimeout> | null = null
+
+  const closeWatchers = () => {
+    const activeWatchers = watchers
+    // Clear the collection first so errors from a watcher being closed cannot
+    // schedule a restart after it is no longer part of the active set.
+    watchers = []
+    for (const watcher of activeWatchers) {
+      try {
+        watcher.close()
+      } catch {
+        // A failed close must not prevent the remaining watchers from closing.
+      }
+    }
+  }
+
+  const stopWatching = () => {
+    if (watcherRetry) {
+      clearTimeout(watcherRetry)
+      watcherRetry = null
+    }
+    if (debounce) {
+      clearTimeout(debounce)
+      debounce = null
+    }
+    closeWatchers()
+  }
 
   const notify = (event: string, data: unknown) => {
     if (!serverRef) return
@@ -249,8 +276,7 @@ export function playdateProjectBridge(): Plugin {
   }
 
   const attachWatchers = () => {
-    for (const w of watchers) w.close()
-    watchers = []
+    closeWatchers()
     ensureEditorDirs()
     const dirs = [SCENES_DIR, SOURCE_DIR, EDITOR_DIR, join(PACKAGE_ROOT, 'schema')]
     for (const dir of dirs) {
@@ -309,9 +335,29 @@ export function playdateProjectBridge(): Plugin {
             notify('playdate:workspace-changed', { name })
           }
         })
+        w.on('error', (error) => {
+          if (!watchers.includes(w)) return
+
+          // An unobserved FSWatcher error is fatal in Node. Recreate the whole
+          // set after a short delay because a transient directory replacement can
+          // invalidate more than one recursive watcher on Windows.
+          const message = error instanceof Error ? error.message : String(error)
+          serverRef?.config.logger.warn(
+            `[playdate-project-bridge] File watcher failed; retrying: ${message}`,
+          )
+          closeWatchers()
+          if (!serverRef || watcherRetry) return
+          watcherRetry = setTimeout(() => {
+            watcherRetry = null
+            if (serverRef) attachWatchers()
+          }, 1_000)
+        })
         watchers.push(w)
-      } catch {
-        /* watch may fail on some FS */
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        serverRef?.config.logger.warn(
+          `[playdate-project-bridge] Could not watch ${dir}: ${message}`,
+        )
       }
     }
   }
@@ -322,6 +368,10 @@ export function playdateProjectBridge(): Plugin {
       serverRef = server
       ensureEditorDirs()
       attachWatchers()
+      server.httpServer?.once('close', () => {
+        stopWatching()
+        serverRef = null
+      })
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? ''
@@ -687,8 +737,8 @@ export function playdateProjectBridge(): Plugin {
       }
     },
     closeBundle() {
-      for (const w of watchers) w.close()
-      watchers = []
+      stopWatching()
+      serverRef = null
     },
   }
 }
