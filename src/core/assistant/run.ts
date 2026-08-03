@@ -36,11 +36,25 @@ export type AssistantChunk =
   | { type: 'error'; message: string }
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000
+// Give a CLI a short chance to flush and exit cleanly, without leaving an
+// abandoned process alive after its SSE client or the dev server goes away.
+const TERMINATION_GRACE_MS = 1_000
 
 export function startAssistantRun(
   input: AssistantRunInput,
   onChunk: (chunk: AssistantChunk) => void,
 ): { kill: () => void } {
+  const emit = (chunk: AssistantChunk) => {
+    try {
+      onChunk(chunk)
+    } catch (error) {
+      // Output consumers commonly write to sockets. Never let a closed client
+      // turn a child-process event or timeout callback into a fatal exception.
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[happy-editor] Assistant output consumer failed: ${message}`)
+    }
+  }
+
   const binary = findProviderBinary(input.provider)
   const cmd = buildProviderCommand({
     provider: input.provider,
@@ -52,8 +66,8 @@ export function startAssistantRun(
     model: input.model,
   })
   if ('error' in cmd) {
-    onChunk({ type: 'error', message: cmd.error })
-    onChunk({ type: 'done', code: 1, signal: null })
+    emit({ type: 'error', message: cmd.error })
+    emit({ type: 'done', code: 1, signal: null })
     return { kill: () => {} }
   }
 
@@ -65,19 +79,70 @@ export function startAssistantRun(
       windowsHide: true,
     })
   } catch (e) {
-    onChunk({
+    emit({
       type: 'error',
       message: e instanceof Error ? e.message : 'Failed to spawn assistant CLI',
     })
-    onChunk({ type: 'done', code: 1, signal: null })
+    emit({ type: 'done', code: 1, signal: null })
     return { kill: () => {} }
   }
 
-  let settled = false
-  const settle = (chunk: AssistantChunk) => {
-    if (settled) return
-    settled = true
-    onChunk(chunk)
+  let closeObserved = false
+  let done = false
+  let errorEmitted = false
+  let terminationRequested = false
+  let timeoutTimer: ReturnType<typeof setTimeout> | null = null
+  let killTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearTerminationTimers = () => {
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer)
+      timeoutTimer = null
+    }
+    if (killTimer) {
+      clearTimeout(killTimer)
+      killTimer = null
+    }
+  }
+
+  const emitDone = (code: number | null, signal: NodeJS.Signals | null) => {
+    if (done) return
+    done = true
+    emit({ type: 'done', code, signal })
+  }
+
+  const emitError = (message: string) => {
+    if (closeObserved || errorEmitted) return
+    errorEmitted = true
+    emit({ type: 'error', message })
+  }
+
+  const requestTermination = (message?: string) => {
+    if (closeObserved) return
+    if (message) emitError(message)
+    if (terminationRequested) return
+    terminationRequested = true
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer)
+      timeoutTimer = null
+    }
+    try {
+      child.kill('SIGTERM')
+    } catch (error) {
+      emitError(
+        error instanceof Error ? error.message : 'Failed to stop assistant CLI',
+      )
+    }
+    killTimer = setTimeout(() => {
+      if (closeObserved) return
+      try {
+        child.kill('SIGKILL')
+      } catch (error) {
+        emitError(
+          error instanceof Error ? error.message : 'Failed to force-stop assistant CLI',
+        )
+      }
+    }, TERMINATION_GRACE_MS)
   }
 
   const streamState = createAssistantStreamState()
@@ -88,30 +153,27 @@ export function startAssistantRun(
   ) => {
     for (const ev of events) {
       if (ev.kind === 'step') {
-        onChunk({ type: 'step', label: ev.label, tool: ev.tool })
+        emit({ type: 'step', label: ev.label, tool: ev.tool })
       } else if (ev.kind === 'text') {
         if (ev.text) {
           emittedText = true
-          onChunk({ type: 'stdout', text: ev.text })
+          emit({ type: 'stdout', text: ev.text })
         }
       } else if (ev.kind === 'result') {
         // Prefer streamed assistant text; result is a fallback when none arrived.
         if (!emittedText && ev.text) {
           emittedText = true
-          onChunk({ type: 'stdout', text: ev.text })
+          emit({ type: 'stdout', text: ev.text })
         }
       }
     }
   }
 
   const timeoutMs = input.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  const timer = setTimeout(() => {
-    child.kill('SIGTERM')
-    settle({
-      type: 'error',
-      message: `Assistant timed out after ${Math.round(timeoutMs / 1000)}s`,
-    })
-    settle({ type: 'done', code: null, signal: 'SIGTERM' })
+  timeoutTimer = setTimeout(() => {
+    requestTermination(
+      `Assistant timed out after ${Math.round(timeoutMs / 1000)}s`,
+    )
   }, timeoutMs)
 
   child.stdout.setEncoding('utf8')
@@ -120,25 +182,22 @@ export function startAssistantRun(
     if (text) emitParsed(parseAssistantStreamChunk(text, streamState))
   })
   child.stderr.on('data', (text: string) => {
-    if (text) onChunk({ type: 'stderr', text })
+    if (text) emit({ type: 'stderr', text })
   })
   child.on('error', (err) => {
-    clearTimeout(timer)
-    settle({ type: 'error', message: err.message })
-    settle({ type: 'done', code: 1, signal: null })
+    requestTermination(err.message)
   })
   child.on('close', (code, signal) => {
-    clearTimeout(timer)
+    if (closeObserved) return
+    closeObserved = true
+    clearTerminationTimers()
     emitParsed(flushAssistantStream(streamState))
-    settle({ type: 'done', code, signal })
+    emitDone(code, signal)
   })
 
   return {
     kill: () => {
-      clearTimeout(timer)
-      if (!settled) {
-        child.kill('SIGTERM')
-      }
+      requestTermination()
     },
   }
 }

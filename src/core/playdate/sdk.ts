@@ -104,6 +104,12 @@ export function buildAndRunSimulator(scene: Scene): RunSimulatorResult {
     stdio: 'ignore',
     windowsHide: false,
   })
+  child.once('error', (error) => {
+    // spawn() reports some launch failures asynchronously. The HTTP endpoint
+    // already returned its synchronous build result, so contain and surface
+    // the later failure rather than allowing an unhandled EventEmitter error.
+    console.warn(`[happy-editor] Failed to launch Playdate Simulator: ${error.message}`)
+  })
   child.unref()
 
   return {

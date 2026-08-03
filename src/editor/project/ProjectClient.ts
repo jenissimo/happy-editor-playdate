@@ -207,6 +207,12 @@ export class ProjectClient {
     handlers: AssistantRunHandlers,
   ): { abort: () => void } {
     const controller = new AbortController()
+    let terminalDelivered = false
+    const finish = (result: { code: number | null; signal: string | null }) => {
+      if (terminalDelivered) return
+      terminalDelivered = true
+      handlers.onDone?.(result)
+    }
     void (async () => {
       try {
         const res = await fetch(`${API}/assistant/run`, {
@@ -232,12 +238,12 @@ export class ProjectClient {
             /* ignore */
           }
           handlers.onError?.(message, code)
-          handlers.onDone?.({ code: res.status, signal: null })
+          finish({ code: res.status, signal: null })
           return
         }
         if (!res.body) {
           handlers.onError?.('Empty response body')
-          handlers.onDone?.({ code: 1, signal: null })
+          finish({ code: 1, signal: null })
           return
         }
         const reader = res.body.getReader()
@@ -277,7 +283,7 @@ export class ProjectClient {
             } else if (event === 'error' && typeof payload.message === 'string') {
               handlers.onError?.(payload.message)
             } else if (event === 'done') {
-              handlers.onDone?.({
+              finish({
                 code: (payload.code as number | null) ?? null,
                 signal: (payload.signal as string | null) ?? null,
               })
@@ -286,15 +292,16 @@ export class ProjectClient {
             }
           }
         }
+        finish({ code: null, signal: 'eof' })
       } catch (e) {
         if (controller.signal.aborted) {
-          handlers.onDone?.({ code: null, signal: 'aborted' })
+          finish({ code: null, signal: 'aborted' })
           return
         }
         handlers.onError?.(
           e instanceof Error ? e.message : 'Assistant request failed',
         )
-        handlers.onDone?.({ code: 1, signal: null })
+        finish({ code: 1, signal: null })
       }
     })()
 

@@ -72,18 +72,111 @@ const MIME: Record<string, string> = {
   json: 'application/json',
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown) {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'application/json')
-  res.end(JSON.stringify(body))
+function isResponseWritable(res: ServerResponse): boolean {
+  return !res.destroyed && !res.writableEnded && res.writable
 }
 
-function readBody(req: IncomingMessage): Promise<string> {
+export function createSseEventWriter(res: ServerResponse) {
+  let writable = true
+  return (event: string, data: unknown): boolean => {
+    if (!writable || !isResponseWritable(res)) {
+      writable = false
+      return false
+    }
+    try {
+      const accepted = res.write(
+        `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+      )
+      // Backpressure means future chunks would accumulate in ServerResponse's
+      // buffer. Latch permanently and let the matching run terminate instead.
+      if (!accepted) writable = false
+      return accepted
+    } catch {
+      writable = false
+      return false
+    }
+  }
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown) {
+  if (!isResponseWritable(res)) return
+  try {
+    res.statusCode = status
+    res.setHeader('Content-Type', 'application/json')
+    res.end(JSON.stringify(body))
+  } catch {
+    // A client can close between the writable check and an HTTP write.
+  }
+}
+
+function sendBytes(res: ServerResponse, contentType: string, body: Buffer) {
+  if (!isResponseWritable(res)) return
+  try {
+    res.statusCode = 200
+    res.setHeader('Content-Type', contentType)
+    res.setHeader('Cache-Control', 'no-cache')
+    res.end(body)
+  } catch {
+    // A client can close between the writable check and an HTTP write.
+  }
+}
+
+const MAX_REQUEST_BODY_BYTES = 5 * 1024 * 1024
+
+class RequestBodyTooLargeError extends Error {
+  constructor() {
+    super(`Request body exceeds ${MAX_REQUEST_BODY_BYTES} bytes`)
+  }
+}
+
+class RequestAbortedError extends Error {
+  constructor() {
+    super('Request aborted by client')
+  }
+}
+
+function readBody(
+  req: IncomingMessage,
+  limit = MAX_REQUEST_BODY_BYTES,
+): Promise<string> {
   return new Promise((resolveBody, reject) => {
     const chunks: Buffer[] = []
-    req.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)))
-    req.on('end', () => resolveBody(Buffer.concat(chunks).toString('utf8')))
-    req.on('error', reject)
+    let size = 0
+    let settled = false
+    const rejectOnce = (error: Error) => {
+      if (settled) return
+      settled = true
+      reject(error)
+    }
+    req.on('error', (error) => {
+      rejectOnce(error)
+    })
+    req.on('aborted', () => {
+      rejectOnce(new RequestAbortedError())
+    })
+    const contentLength = Number(req.headers['content-length'])
+    if (Number.isFinite(contentLength) && contentLength > limit) {
+      req.resume()
+      rejectOnce(new RequestBodyTooLargeError())
+      return
+    }
+    req.on('data', (chunk: Buffer | string) => {
+      if (settled) return
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      size += buffer.length
+      if (size > limit) {
+        chunks.length = 0
+        req.resume()
+        rejectOnce(new RequestBodyTooLargeError())
+        return
+      }
+      chunks.push(buffer)
+    })
+    req.on('end', () => {
+      if (settled) return
+      settled = true
+      resolveBody(Buffer.concat(chunks).toString('utf8'))
+    })
   })
 }
 
@@ -235,6 +328,17 @@ function prepareNibbleRunPack(input: {
 
 let activeAssistantKill: (() => void) | null = null
 
+function stopActiveAssistant(expected?: () => void) {
+  if (expected && activeAssistantKill !== expected) return
+  if (!activeAssistantKill) return
+  try {
+    activeAssistantKill()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[happy-editor] Failed to stop assistant CLI: ${message}`)
+  }
+}
+
 export function playdateProjectBridge(): Plugin {
   let watchers: FSWatcher[] = []
   let serverRef: ViteDevServer | null = null
@@ -271,17 +375,57 @@ export function playdateProjectBridge(): Plugin {
     if (!serverRef) return
     if (debounce) clearTimeout(debounce)
     debounce = setTimeout(() => {
-      broadcast(serverRef!, event, data)
+      debounce = null
+      const server = serverRef
+      if (!server) return
+      try {
+        broadcast(server, event, data)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        server.config.logger.warn(
+          `[playdate-project-bridge] Could not broadcast ${event}: ${message}`,
+        )
+      }
     }, 40)
   }
 
+  const logWatcherFailure = (error: unknown, context: string) => {
+    const message = error instanceof Error ? error.message : String(error)
+    serverRef?.config.logger.warn(
+      `[playdate-project-bridge] ${context}; retrying: ${message}`,
+    )
+  }
+
+  const scheduleWatcherRetry = () => {
+    if (!serverRef || watcherRetry) return
+    watcherRetry = setTimeout(() => {
+      watcherRetry = null
+      if (!serverRef || watchers.length > 0) return
+      try {
+        attachWatchers()
+      } catch (error) {
+        // Retries run outside Vite's request lifecycle and must not turn an
+        // intermittent filesystem failure into an uncaught timer exception.
+        logWatcherFailure(error, 'Could not restore file watchers')
+        scheduleWatcherRetry()
+      }
+    }, 1_000)
+  }
+
   const attachWatchers = () => {
+    if (!serverRef || watchers.length > 0) return
     closeWatchers()
-    ensureEditorDirs()
+    try {
+      ensureEditorDirs()
+    } catch (error) {
+      logWatcherFailure(error, 'Could not prepare editor directories')
+      scheduleWatcherRetry()
+      return
+    }
     const dirs = [SCENES_DIR, SOURCE_DIR, EDITOR_DIR, join(PACKAGE_ROOT, 'schema')]
     for (const dir of dirs) {
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
       try {
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
         const w = watch(dir, { recursive: true }, (_kind, filename) => {
           if (!filename) return
           const name = filename.toString().replace(/\\/g, '/')
@@ -341,23 +485,16 @@ export function playdateProjectBridge(): Plugin {
           // An unobserved FSWatcher error is fatal in Node. Recreate the whole
           // set after a short delay because a transient directory replacement can
           // invalidate more than one recursive watcher on Windows.
-          const message = error instanceof Error ? error.message : String(error)
-          serverRef?.config.logger.warn(
-            `[playdate-project-bridge] File watcher failed; retrying: ${message}`,
-          )
+          logWatcherFailure(error, 'File watcher failed')
           closeWatchers()
-          if (!serverRef || watcherRetry) return
-          watcherRetry = setTimeout(() => {
-            watcherRetry = null
-            if (serverRef) attachWatchers()
-          }, 1_000)
+          scheduleWatcherRetry()
         })
         watchers.push(w)
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        serverRef?.config.logger.warn(
-          `[playdate-project-bridge] Could not watch ${dir}: ${message}`,
-        )
+        logWatcherFailure(error, `Could not watch ${dir}`)
+        closeWatchers()
+        scheduleWatcherRetry()
+        return
       }
     }
   }
@@ -366,16 +503,23 @@ export function playdateProjectBridge(): Plugin {
     name: 'playdate-project-bridge',
     configureServer(server) {
       serverRef = server
-      ensureEditorDirs()
       attachWatchers()
       server.httpServer?.once('close', () => {
         stopWatching()
+        stopActiveAssistant()
         serverRef = null
       })
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? ''
         if (!url.startsWith('/__playdate/')) return next()
+
+        res.on('error', (error) => {
+          const message = error instanceof Error ? error.message : String(error)
+          server.config.logger.warn(
+            `[playdate-project-bridge] HTTP response failed: ${message}`,
+          )
+        })
 
         try {
           if (url.startsWith('/__playdate/assets/')) {
@@ -385,10 +529,7 @@ export function playdateProjectBridge(): Plugin {
             const buf = readAssetBytes(rel)
             if (!buf) return sendJson(res, 404, { error: 'not found' })
             const ext = rel.split('.').pop()?.toLowerCase() ?? ''
-            res.statusCode = 200
-            res.setHeader('Content-Type', MIME[ext] ?? 'application/octet-stream')
-            res.setHeader('Cache-Control', 'no-cache')
-            res.end(buf)
+            sendBytes(res, MIME[ext] ?? 'application/octet-stream', buf)
             return
           }
 
@@ -644,28 +785,59 @@ export function playdateProjectBridge(): Plugin {
             })
 
             if (activeAssistantKill) {
-              activeAssistantKill()
-              activeAssistantKill = null
+              stopActiveAssistant()
             }
 
-            res.statusCode = 200
-            res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
-            res.setHeader('Cache-Control', 'no-cache, no-transform')
-            res.setHeader('Connection', 'keep-alive')
-            res.flushHeaders?.()
-
-            const writeEvent = (event: string, data: unknown) => {
-              if (res.writableEnded) return
-              res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+            let runKill: (() => void) | null = null
+            let assistantFinished = false
+            let terminationRequested = false
+            const clearActiveRun = () => {
+              if (runKill && activeAssistantKill === runKill) {
+                activeAssistantKill = null
+              }
+            }
+            const stopRunForClient = () => {
+              if (!runKill || terminationRequested) return
+              terminationRequested = true
+              stopActiveAssistant(runKill)
             }
 
-            writeEvent('start', {
-              provider: status.provider,
-              mode,
-              scene: sceneFile.name,
-              hasPreview: pack.hasPreview,
-              effort: status.effort,
-            })
+            if (!isResponseWritable(res)) return
+            try {
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
+              res.setHeader('Cache-Control', 'no-cache, no-transform')
+              res.setHeader('Connection', 'keep-alive')
+              res.flushHeaders?.()
+            } catch {
+              return
+            }
+            res.once('close', stopRunForClient)
+            res.once('error', stopRunForClient)
+
+            const writeEvent = createSseEventWriter(res)
+
+            const endSse = () => {
+              if (!isResponseWritable(res)) return
+              try {
+                res.end()
+              } catch {
+                // The SSE client may disconnect between the writable check and end.
+              }
+            }
+
+            if (
+              !writeEvent('start', {
+                provider: status.provider,
+                mode,
+                scene: sceneFile.name,
+                hasPreview: pack.hasPreview,
+                effort: status.effort,
+              })
+            ) {
+              endSse()
+              return
+            }
 
             const run = startAssistantRun(
               {
@@ -677,35 +849,33 @@ export function playdateProjectBridge(): Plugin {
                 model: status.model,
               },
               (chunk) => {
+                const writeAssistantEvent = (event: string, data: unknown) => {
+                  if (!writeEvent(event, data)) stopRunForClient()
+                }
                 if (chunk.type === 'stdout') {
-                  writeEvent('stdout', { text: chunk.text })
+                  writeAssistantEvent('stdout', { text: chunk.text })
                 } else if (chunk.type === 'stderr') {
-                  writeEvent('stderr', { text: chunk.text })
+                  writeAssistantEvent('stderr', { text: chunk.text })
                 } else if (chunk.type === 'step') {
-                  writeEvent('step', {
+                  writeAssistantEvent('step', {
                     label: chunk.label,
                     tool: chunk.tool,
                   })
                 } else if (chunk.type === 'error') {
-                  writeEvent('error', { message: chunk.message })
+                  writeAssistantEvent('error', { message: chunk.message })
                 } else if (chunk.type === 'done') {
-                  writeEvent('done', {
+                  writeAssistantEvent('done', {
                     code: chunk.code,
                     signal: chunk.signal,
                   })
-                  activeAssistantKill = null
-                  if (!res.writableEnded) res.end()
+                  assistantFinished = true
+                  clearActiveRun()
+                  endSse()
                 }
               },
             )
-            activeAssistantKill = run.kill
-
-            req.on('close', () => {
-              if (activeAssistantKill === run.kill) {
-                run.kill()
-                activeAssistantKill = null
-              }
-            })
+            runKill = run.kill
+            if (!assistantFinished) activeAssistantKill = runKill
             return
           }
 
@@ -714,14 +884,19 @@ export function playdateProjectBridge(): Plugin {
             req.method === 'POST'
           ) {
             if (activeAssistantKill) {
-              activeAssistantKill()
-              activeAssistantKill = null
+              stopActiveAssistant()
             }
             return sendJson(res, 200, { ok: true })
           }
 
           return sendJson(res, 404, { error: 'unknown api route' })
         } catch (e) {
+          if (e instanceof RequestBodyTooLargeError) {
+            return sendJson(res, 413, { error: 'request body too large' })
+          }
+          if (e instanceof RequestAbortedError) {
+            return sendJson(res, 400, { error: 'request aborted' })
+          }
           return sendJson(res, 500, {
             error: e instanceof Error ? e.message : 'internal error',
           })
@@ -738,6 +913,7 @@ export function playdateProjectBridge(): Plugin {
     },
     closeBundle() {
       stopWatching()
+      stopActiveAssistant()
       serverRef = null
     },
   }

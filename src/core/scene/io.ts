@@ -66,6 +66,15 @@ export function createSceneValidator() {
   return ajv.compile(loadSchema())
 }
 
+let defaultSceneValidator: ReturnType<typeof createSceneValidator> | undefined
+
+export function getDefaultSceneValidator(): ReturnType<typeof createSceneValidator> {
+  // AJV retains every compiled schema. Scene validation is on the save/list hot
+  // path, so compile the package schema once per server process instead.
+  defaultSceneValidator ??= createSceneValidator()
+  return defaultSceneValidator
+}
+
 export function revisionOf(content: string): string {
   return createHash('sha1').update(content).digest('hex').slice(0, 12)
 }
@@ -85,7 +94,7 @@ export function collectNodeIds(
 
 export function validateSceneObject(
   scene: unknown,
-  validate = createSceneValidator(),
+  validate = getDefaultSceneValidator(),
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   const ok = validate(scene)
