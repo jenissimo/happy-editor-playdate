@@ -10,12 +10,12 @@ import {
 import { dirname, join, relative } from 'node:path'
 import Ajv2020Module from 'ajv/dist/2020.js'
 import type { Scene } from './types.ts'
-import { exportSceneLua } from './export.ts'
 import {
   ensureProjectConfig,
   getProjectPaths,
   type ProjectConfig,
 } from '../project/paths.ts'
+import { prepareGeneration, publishGeneration, type PreparedGeneration } from './publication.ts'
 
 const Ajv2020 = Ajv2020Module as unknown as new (options?: {
   allErrors?: boolean
@@ -209,10 +209,24 @@ export function sceneLuaPath(sceneName: string): string {
 }
 
 export function generateSceneLua(scene: Scene): { path: string; content: string } {
-  const content = exportSceneLua(scene)
-  const path = sceneLuaPath(scene.name)
-  atomicWrite(path, content)
-  return { path, content }
+  const generated = generateProjectGeneration(scene)
+  return { path: generated.path, content: generated.content }
+}
+
+export function generateProjectGeneration(sceneOverride?: Scene): { prepared: PreparedGeneration; path: string; content: string } {
+  const all = listScenes()
+  const target = sceneOverride && all.find((s) => s.scene.name === sceneOverride.name)
+  if (sceneOverride && !target) throw new Error(`scene override is not part of project: ${sceneOverride.name}`)
+  const scenes: Array<{ name: string; scene: Scene; content: string }> = []
+  for (const item of all) {
+    const useOverride = target === item
+    scenes.push({ name: item.scene.name, scene: useOverride ? (sceneOverride as Scene) : item.scene, content: useOverride ? `${JSON.stringify(sceneOverride)}\n` : readFileSync(item.path, 'utf8') })
+  }
+  const prepared = prepareGeneration(SOURCE_DIR, scenes, { validate: validateSceneObject })
+  publishGeneration(prepared, LUA_SCENES_DIR, [join(PACKAGE_ROOT, 'playdate', 'Source', 'ui_asset_catalog.lua'), join(SOURCE_DIR, 'ui_asset_catalog.lua')])
+  const name = sceneOverride?.name ?? all[0]?.scene.name
+  if (!name) throw new Error('no scenes to generate')
+  return { prepared, path: sceneLuaPath(name), content: prepared.layouts.get(name)! }
 }
 
 export function ensureEditorDirs() {
