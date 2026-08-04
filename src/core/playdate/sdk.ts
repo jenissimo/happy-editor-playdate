@@ -9,7 +9,7 @@ import {
   PDX_OUT,
   SOURCE_DIR,
   atomicWrite,
-  generateSceneLua,
+  generateProjectGeneration,
 } from '../scene/io.ts'
 import type { Scene } from '../scene/types.ts'
 import { exportSceneLua } from '../scene/export.ts'
@@ -58,9 +58,11 @@ export function findSimulator(): string | null {
 
 /** Write Source/active_scene.lua so main.lua can Ui.load(ActiveScene). */
 export function writeActiveSceneLua(scene: Scene): string {
-  const content = exportSceneLua(scene, 'ActiveScene')
+  const generated = generateProjectGeneration(scene)
+  const compiled = generated.prepared.compiled.get(scene.name)
+  if (!compiled) throw new Error(`compiled scene missing: ${scene.name}`)
+  const content = exportSceneLua(compiled, 'ActiveScene')
   atomicWrite(ACTIVE_SCENE_LUA, content)
-  generateSceneLua(scene)
   return ACTIVE_SCENE_LUA
 }
 
