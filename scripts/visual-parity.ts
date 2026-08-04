@@ -31,7 +31,6 @@ import {
   SOURCE_DIR,
   SCENES_DIR,
   listScenes,
-  generateSceneLua,
   readSceneFile,
 } from '../src/core/scene/io.ts'
 import { indexPlaydateAssets } from '../src/core/assets/indexAssets.ts'
@@ -65,7 +64,7 @@ function writeCaptureLua(absPngPath: string | null) {
 function buildPdx(): void {
   const pdc = findPdc()
   if (!pdc) throw new Error('pdc not found')
-  const r = spawnSync(pdc, [SOURCE_DIR, PDX_OUT], {
+  const r = spawnSync(pdc, ['--skip-unknown', SOURCE_DIR, PDX_OUT], {
     encoding: 'utf8',
     env: process.env,
   })
@@ -239,7 +238,6 @@ async function runOneScene(sceneName: string): Promise<boolean> {
   }
 
   console.log(`\nVisual parity · scene="${file.name}"`)
-  generateSceneLua(file.scene)
   writeActiveSceneLua(file.scene)
 
   const previewRaw = join(OUT_DIR, `${file.name}-preview.png`)
