@@ -143,7 +143,11 @@ Confirm what was resolved:
 bun run project:info
 ```
 
-Copy `playdate/Source/ui.lua` (and fonts/images you need) into the host `Source/` so generated scenes can draw on device.
+Install the editor-owned UI runtime into the host with `bun run runtime:sync`.
+Use `bun run runtime:check` in CI to detect a stale or hand-edited installation.
+The command copies `playdate/Source/ui.lua` and its `ui/` support modules into
+the configured `sourceRoot`; `import "ui"` loads those support modules itself.
+Fonts and images remain owned by the host game.
 
 ### Standalone (this repo)
 

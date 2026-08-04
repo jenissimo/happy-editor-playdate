@@ -285,6 +285,9 @@ transform parent at draw time). Runtime `Ui.set` / `Ui.animate` on a group's
 ## Runtime API (`playdate/Source/ui.lua`)
 
 Load a generated scene module, then mutate nodes by stable `id` each frame.
+The runtime is owned by HappyEditor and installed into a host project with
+`bun run runtime:sync`; `bun run runtime:check` verifies that the installed
+facade and support modules match the canonical copy.
 
 ```lua
 import "ui"
