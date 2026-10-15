@@ -959,7 +959,22 @@ function Ui.load(scene)
     indexNodes(Ui._working.nodes or {})
     Ui._compiled = compiled and true or false
     if compiled then
-        if not Cache.preallocateIslands(cache, compiled, Ui._index) then
+        -- The resident set keeps every earlier scene's assets until something
+        -- needs the room, but the islands are reserved BEFORE this scene's
+        -- assets are preloaded (and so before Assets:reserveEvicting gets a
+        -- chance to make room) -- a scene whose islands do not fit beside that
+        -- residue used to install the empty scene. Drop the least recently used
+        -- asset the incoming scene does not list and try again; a failed
+        -- attempt has already handed its credit back (Cache:preallocateIslands).
+        local placed = Cache.preallocateIslands(cache, compiled, Ui._index)
+        while not placed do
+            local victim = assets:pickEvictionVictim()
+            if victim == nil then break end
+            assets:evict(victim)
+            Cache.reset(cache)
+            placed = Cache.preallocateIslands(cache, compiled, Ui._index)
+        end
+        if not placed then
             print("[Ui] compiled plan preallocation failed (ledger exhausted mid-plan)")
             installEmptyScene()
             return false
