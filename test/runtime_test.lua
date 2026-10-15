@@ -133,4 +133,34 @@ Cache.recordMutation(mutation_cache, child, "asset")
 check(version_after_cascade ~= mutation_cache:version(child),
     "visual changes should invalidate child rasters")
 
+-- A compiled plan that runs out of ledger partway must hand back what it had
+-- already reserved: Ui.load evicts a resident asset and retries on failure,
+-- and a leaked attempt would stay charged across every retry.
+local Memory = require("ui.memory")
+local ledger = Memory.new(4096, 4)
+check(ledger:reserve(100, 1), "a resident asset takes one bitmap")
+local plan_cache = Cache.new(gfx, 400, 240, ledger)
+local plan_index = {
+    a = { id = "a", type = "shape", w = 32, h = 8 },
+    b = { id = "b", type = "shape", w = 32, h = 8 },
+    c = { id = "c", type = "shape", w = 32, h = 8 },
+}
+-- a singleton (one bitmap), then a two-member island (its own bitmap plus a
+-- promotion slot per member): five bitmaps against the four the ledger allows
+local plan = { islands = {
+    { id = "one", w = 32, h = 8, members = { "a" } },
+    { id = "two", w = 32, h = 8, members = { "b", "c" } },
+} }
+check(not plan_cache:preallocateIslands(plan, plan_index),
+    "a plan past the ledger should fail")
+local held_bytes, held_bitmaps = ledger:stats()
+check(held_bytes == 100 and held_bitmaps == 1,
+    "a failed preallocation should hand back everything it reserved")
+Cache.reset(plan_cache)
+ledger:release(100, 1)
+check(plan_cache:preallocateIslands(plan, plan_index),
+    "the same plan should fit once the resident asset is gone")
+held_bytes, held_bitmaps = ledger:stats()
+check(held_bitmaps == 4, "a placed plan should hold exactly its own bitmaps")
+
 print("runtime smoke: ok")

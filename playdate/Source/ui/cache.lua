@@ -135,7 +135,8 @@ end
 
 -- Compiled islands are preallocated at Ui.load. Each record owns fixed
 -- capacity and ordered members; no draw/update code is allowed to grow it.
-function Cache:preallocateIslands(plan, index)
+-- The body of Cache:preallocateIslands below, which adds the rollback.
+local function placeIslands(self, plan, index)
     local islands, by_node = {}, {}
     for i = 1, #(plan.islands or {}) do
         local spec = plan.islands[i]
@@ -207,6 +208,25 @@ function Cache:preallocateIslands(plan, index)
     self.islands, self.island_by_node, self.active_islands = islands, by_node, #islands
     self.sealed = true
     return true
+end
+
+-- All or nothing on the ledger. A plan that runs out of room partway has
+-- already reserved its earlier island bitmaps, promotion slots and text
+-- scratch; Cache.reset() drops those tables but never releases their credit
+-- (Assets:reset's ledger rebuild is what normally recovers it, on the NEXT
+-- load). So a failed attempt hands back exactly what it reserved, and a caller
+-- that frees room and retries (Ui.load) is charged for one attempt, not for
+-- every attempt so far. Call Cache.reset() before retrying.
+function Cache:preallocateIslands(plan, index)
+    local ledger = self.ledger
+    local bytes, bitmaps = 0, 0
+    if ledger then bytes, bitmaps = ledger:stats() end
+    if placeIslands(self, plan, index) then return true end
+    if ledger then
+        local now_bytes, now_bitmaps = ledger:stats()
+        ledger:release(now_bytes - bytes, now_bitmaps - bitmaps)
+    end
+    return false
 end
 
 function Cache:canFit(node, w, h, scale)
