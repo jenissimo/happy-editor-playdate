@@ -327,10 +327,20 @@ end
 
 -- Group/state gates affect flattened compiled descendants without changing
 -- their raster geometry. Rebuild coalesced islands in place; never promote.
-function Cache:invalidateUnpromotedGates()
+-- `affects(member)`, when given, narrows that to the islands holding a member
+-- the gate actually changed (Ui.setState, a group's visible/states).
+function Cache:invalidateUnpromotedGates(affects)
     for i = 1, #(self.islands or {}) do
         local island = self.islands[i]
-        if not island.promoted and #island.members > 1 then island.dirty = true end
+        if not island.promoted and #island.members > 1 and not island.dirty then
+            if affects == nil then
+                island.dirty = true
+            else
+                for j = 1, #island.members do
+                    if affects(island.members[j]) then island.dirty = true; break end
+                end
+            end
+        end
     end
 end
 
