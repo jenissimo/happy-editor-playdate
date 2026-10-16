@@ -133,4 +133,87 @@ Cache.recordMutation(mutation_cache, child, "asset")
 check(version_after_cascade ~= mutation_cache:version(child),
     "visual changes should invalidate child rasters")
 
+-- Gate invalidation is narrowed to the islands an affected member sits in.
+local gate_cache = Cache.new(gfx, 400, 240)
+local m1, m2, m3, m4 = { id = "m1" }, { id = "m2" }, { id = "m3" }, { id = "m4" }
+gate_cache.islands = {
+    { members = { m1, m2 }, promoted = false, dirty = false },
+    { members = { m3, m4 }, promoted = false, dirty = false },
+}
+gate_cache:invalidateUnpromotedGates(function(member) return member == m3 end)
+check(not gate_cache.islands[1].dirty, "a gate change should leave unaffected islands clean")
+check(gate_cache.islands[2].dirty, "a gate change should rebuild the island holding an affected member")
+gate_cache.islands[2].dirty = false
+gate_cache:invalidateUnpromotedGates()
+check(gate_cache.islands[1].dirty and gate_cache.islands[2].dirty, "no predicate should still rebuild every island")
+
+-- Native dither/gradient fills paint exactly the pixels of the per-pixel
+-- reference: a framebuffer model of setColor / setStencilPattern (8 rows, bit
+-- 7 leftmost, 1 = draw, anchored to the device past the draw offset -- what
+-- the SDK does, measured in the Simulator) / fillRect / drawPixel, random
+-- shapes over a random background, every pixel compared.
+do
+    local pgfx = playdate.graphics
+    pgfx.kColorBlack, pgfx.kColorWhite = 0, 1
+    local fb, color, stencil, ox, oy = {}, 0, nil, 0, 0
+    local function plot(x, y)
+        local X, Y = x + ox, y + oy
+        if stencil and (stencil[(Y & 7) + 1] & (0x80 >> (X & 7))) == 0 then return end
+        fb[Y * 4096 + X] = color
+    end
+    pgfx.setColor = function(c) color = (c == pgfx.kColorWhite) and 1 or 0 end
+    pgfx.setStencilPattern = function(t)
+        stencil = {}
+        for i = 1, 8 do stencil[i] = t[i] end
+    end
+    pgfx.clearStencil = function() stencil = nil end
+    pgfx.fillRect = function(x, y, w, h)
+        for yy = y, y + h - 1 do for xx = x, x + w - 1 do plot(xx, yy) end end
+    end
+    pgfx.drawPixel = plot
+    pgfx.setDrawOffset = function(x, y) ox, oy = x, y end
+    pgfx.getDrawOffset = function() return ox, oy end
+
+    local seed = 12345
+    local function rand(lo, hi)
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        return lo + (seed >> 8) % (hi - lo + 1)
+    end
+    local function render(native, fill, x, y, w, h, radius, dx, dy, origin_x, origin_y, background)
+        fb = {}
+        for k, v in pairs(background) do fb[k] = v end
+        ox, oy = dx, dy
+        Ui._debugSetNativeDither(native)
+        Ui._debugFillShape(fill, x, y, w, h, radius, origin_x, origin_y)
+        Ui._debugSetNativeDither(true)
+        return fb
+    end
+    local PATTERNS = { "bayer2", "bayer4", "bayer8", "horizontal", "vertical",
+        "diagonal", "screen", "checker", "dots", "unknown" }
+    for case = 1, 400 do
+        local fill
+        if case % 2 == 0 then
+            fill = { kind = "dither", pattern = PATTERNS[rand(1, #PATTERNS)],
+                color = rand(0, 1) == 0 and "black" or "white" }
+        else
+            fill = { kind = "gradient", axis = rand(0, 1) == 0 and "h" or "v",
+                from = rand(-20, 120) / 100, to = rand(-20, 120) / 100,
+                color = rand(0, 1) == 0 and "black" or "white" }
+        end
+        local w, h = rand(1, 48), rand(1, 48)
+        local x, y = rand(-12, 30) + (rand(0, 3) == 0 and 0.5 or 0), rand(-12, 30)
+        local radius, dx, dy = rand(0, 14), rand(-9, 9), rand(-9, 9)
+        local origin_x, origin_y = rand(-9, 9), rand(-9, 9)
+        local background = {}
+        for _ = 1, 200 do background[rand(-20, 90) * 4096 + rand(-20, 90)] = rand(0, 1) end
+        local want = render(false, fill, x, y, w, h, radius, dx, dy, origin_x, origin_y, background)
+        local got = render(true, fill, x, y, w, h, radius, dx, dy, origin_x, origin_y, background)
+        local same = true
+        for k, v in pairs(want) do if got[k] ~= v then same = false end end
+        for k, v in pairs(got) do if want[k] ~= v then same = false end end
+        check(same, string.format("native %s fill should match the reference (case %d: %s %dx%d r%d)",
+            fill.kind, case, fill.pattern or fill.axis, w, h, radius))
+    end
+end
+
 print("runtime smoke: ok")

@@ -157,10 +157,21 @@ local function sameValue(a, b)
     return a == b
 end
 
+local function isDescendant(node, group)
+    local current = Ui._parents and Ui._parents[node] or nil
+    while current do
+        if current == group then return true end
+        current = Ui._parents[current]
+    end
+    return false
+end
+
 local function recordMutation(node, property, old_value, new_value)
     Cache.recordMutation(cache, node, property)
     if node.type == "group" and (property == "visible" or property == "states") then
-        cache:invalidateUnpromotedGates()
+        -- Only the coalesced islands that baked one of this group's
+        -- descendants have the old gate in their raster.
+        cache:invalidateUnpromotedGates(function(member) return isDescendant(member, node) end)
     end
     -- Every call site above already guards on the value actually changing
     -- (setNodeProperty's sameValue check, applyGroupXYCascade's shifted_x/y
@@ -431,15 +442,122 @@ local function fillRoundOrRectMasked(x, y, w, h, radius, hit)
     end
 end
 
-local function fillRoundOrRectDithered(x, y, w, h, radius, pattern, density)
+-- Native ordered fills. ditherHit depends on a pixel's position only through
+-- (sx & 7, sy & 7) -- every pattern above repeats every 1, 2, 4 or 8 pixels --
+-- so wherever the density holds still, a dither is the ink colour through one
+-- 8x8 stencil and one gfx.fillRect instead of a Lua call and a drawPixel per
+-- pixel: a 400x240 gradient was ~96 000 iterations, re-run on every raster of
+-- its island, which is most of a second on device (402x388 in the Simulator:
+-- 158 ms per-pixel, 2.4 ms native). The stencil is built BY ditherHit, so the
+-- two paths cannot disagree; the per-pixel one still does the round corners
+-- and stays selectable as the reference (Ui._debugSetNativeDither) for the
+-- tests that compare the two.
+--
+-- A stencil, not a masked 16-row setPattern: the SDK draws a masked pattern
+-- right only while its colour bits stay at 0 (black); white bits under a mask
+-- land on the wrong pixels (0x55 paints the columns of 0xAA). The stencil
+-- takes the plain ink colour and is exact for both.
+local native_dither = true
+local dither_rows = { 0, 0, 0, 0, 0, 0, 0, 0 }
+
+-- Stencil row r + 1, bit 7 - c lets through the pixels whose DEVICE position
+-- is (c, r) mod 8 (the stencil is anchored to the screen, past the draw
+-- offset), i.e. drawing position (c - dx, r - dy): only the hits are drawn, a
+-- miss keeps what is under it -- exactly what the drawPixel path leaves.
+local function setDitherStencil(pattern, density)
+    local dx, dy = 0, 0
+    if gfx.getDrawOffset then dx, dy = gfx.getDrawOffset() end
+    for r = 0, 7 do
+        local bits = 0
+        for c = 0, 7 do
+            if ditherHit(pattern, density, c - dx, r - dy) then bits = bits | (0x80 >> c) end
+        end
+        dither_rows[r + 1] = bits
+    end
+    gfx.setStencilPattern(dither_rows)
+end
+
+local function clearStencil()
+    if gfx.clearStencil then gfx.clearStencil() else gfx.clearStencilImage() end
+end
+
+-- The bayer8 test `d > k / 64` holds for exactly the k below ceil(64 d) (both
+-- sides are exact in binary floating point, 32-bit floats included), so two
+-- densities with the same level paint the same pixels: a gradient changes its
+-- tile at most 65 times, not once per row.
+local function bayer8Level(d)
+    if d <= 0 then return 0 end
+    if d >= 1 then return 64 end
+    return math.ceil(64 * d)
+end
+
+-- The box [rx, rx + rw) x [ry, ry + rh) of a shape at (x, y), shape-local
+-- coordinates. `density_at(i)` is the density of local column i (axis "h") or
+-- row i (axis "v"); with no axis the density is the constant `density`.
+local function fillDitherBox(x, y, rx, ry, rw, rh, pattern, density, axis, density_at)
+    if rw <= 0 or rh <= 0 then return end
+    if axis == nil then
+        setDitherStencil(pattern, density)
+        gfx.fillRect(x + rx, y + ry, rw, rh)
+        return
+    end
+    local first, last = (axis == "h") and rx or ry, ((axis == "h") and (rx + rw) or (ry + rh)) - 1
+    local run_start, run_d, run_level = first, nil, nil
+    for i = first, last + 1 do
+        local d = (i <= last) and density_at(i) or nil
+        local level = d and bayer8Level(d) or -1
+        if level ~= run_level then
+            if run_d ~= nil and run_level > 0 then
+                setDitherStencil(pattern, run_d)
+                if axis == "h" then gfx.fillRect(x + run_start, y + ry, i - run_start, rh)
+                else gfx.fillRect(x + rx, y + run_start, rw, i - run_start) end
+            end
+            run_start, run_d, run_level = i, d, level
+        end
+    end
+end
+
+-- fillRoundOrRectMasked's regions, natively: the corner-free "cross" as up to
+-- three boxes, the four cr x cr corners per pixel through `hit` as before.
+local function fillRoundOrRectDitherNative(x, y, w, h, radius, pattern, density, axis, density_at, white, hit)
+    if w <= 0 or h <= 0 then return end
+    local cr = clampRadius(w, h, radius or 0)
+    setInk(white and "white" or "black")
+    if cr <= 0 then
+        fillDitherBox(x, y, 0, 0, w, h, pattern, density, axis, density_at)
+    else
+        fillDitherBox(x, y, 0, cr, w, h - 2 * cr, pattern, density, axis, density_at)
+        fillDitherBox(x, y, cr, 0, w - 2 * cr, cr, pattern, density, axis, density_at)
+        fillDitherBox(x, y, cr, h - cr, w - 2 * cr, cr, pattern, density, axis, density_at)
+    end
+    clearStencil()
+    if cr <= 0 then return end
+    for _, oy in ipairs({ 0, h - cr }) do
+        for py = oy, oy + cr - 1 do
+            for _, ox in ipairs({ 0, w - cr }) do
+                for px = ox, ox + cr - 1 do
+                    markVisit()
+                    if inRoundRect(px, py, w, h, radius) and hit(px, py, x + px, y + py) then gfx.drawPixel(x + px, y + py) end
+                end
+            end
+        end
+    end
+end
+
+local function fillRoundOrRectDithered(x, y, w, h, radius, pattern, density, white)
     -- A coalesced island member's local offset from its island origin can be
     -- fractional too; floor before ditherHit's bitwise ops for the same
     -- 32-bit reason as the dither_origin floor in rasterNodeContent.
     x = math.floor(x)
     y = math.floor(y)
-    fillRoundOrRectMasked(x, y, w, h, radius, function(px, py, sx, sy)
+    local function hit(px, py, sx, sy)
         return ditherHit(pattern, density, sx, sy)
-    end)
+    end
+    if native_dither and gfx.setStencilPattern then
+        fillRoundOrRectDitherNative(x, y, w, h, radius, pattern, density, nil, nil, white, hit)
+    else
+        fillRoundOrRectMasked(x, y, w, h, radius, hit)
+    end
 end
 
 local function drawShapeFill(fill, x, y, w, h, radius)
@@ -451,7 +569,7 @@ local function drawShapeFill(fill, x, y, w, h, radius)
         return
     end
     if fill.kind == "dither" then
-        fillRoundOrRectDithered(x, y, w, h, radius, fill.pattern or "checker", 0.5)
+        fillRoundOrRectDithered(x, y, w, h, radius, fill.pattern or "checker", 0.5, fill.color == "white")
         clearPattern()
         return
     end
@@ -462,15 +580,21 @@ local function drawShapeFill(fill, x, y, w, h, radius)
         local from = fill.from or 0
         local to = fill.to or 1
         local axis = fill.axis or "h"
-        fillRoundOrRectMasked(x, y, w, h, radius, function(px, py, sx, sy)
-            local dens
-            if axis == "h" then
-                dens = (w <= 1) and to or (from + (to - from) * (px / (w - 1)))
-            else
-                dens = (h <= 1) and to or (from + (to - from) * (py / (h - 1)))
-            end
-            return ditherHit("bayer8", dens, sx, sy)
-        end)
+        -- One expression for both paths: the native fill bands on it, the
+        -- corners and the reference path test it per pixel.
+        local function density_at(i)
+            if axis == "h" then return (w <= 1) and to or (from + (to - from) * (i / (w - 1))) end
+            return (h <= 1) and to or (from + (to - from) * (i / (h - 1)))
+        end
+        local function hit(px, py, sx, sy)
+            return ditherHit("bayer8", density_at(axis == "h" and px or py), sx, sy)
+        end
+        if native_dither and gfx.setStencilPattern then
+            fillRoundOrRectDitherNative(x, y, w, h, radius, "bayer8", nil, axis == "h" and "h" or "v",
+                density_at, fill.color == "white", hit)
+        else
+            fillRoundOrRectMasked(x, y, w, h, radius, hit)
+        end
         clearPattern()
     end
 end
@@ -1006,8 +1130,15 @@ end
 
 function Ui.setState(state)
     if Ui.state == state then return end
+    local previous = Ui.state
     Ui.state = state
-    cache:invalidateUnpromotedGates()
+    -- A coalesced island bakes its members' visibility into one raster, so a
+    -- state change has to rebuild the islands where some member shows in one
+    -- state and not the other -- and ONLY those: rebuilding every island (the
+    -- old rule) re-rasterized a whole static backdrop on every menu move.
+    cache:invalidateUnpromotedGates(function(member)
+        return nodeVisible(member, previous) ~= nodeVisible(member, state)
+    end)
     markDirty()
 end
 
@@ -1348,6 +1479,21 @@ function Ui.draw()
     -- clear the flag so the next unmutated frame skips it again. Left unset
     -- on the `if not scene` early-out above, since nothing was composited.
     Ui._dirty = false
+end
+
+--- Test-only: false routes dither and gradient fills through the per-pixel
+--- reference path instead of the native stencil fills (see setDitherStencil).
+--- Both must paint identical pixels; test/runtime_test.lua compares them.
+function Ui._debugSetNativeDither(enabled)
+    native_dither = enabled and true or false
+end
+
+--- Test-only: one shape fill straight into the current context, with the
+--- dither origin a cached raster would give it.
+function Ui._debugFillShape(fill, x, y, w, h, radius, origin_x, origin_y)
+    dither_origin_x, dither_origin_y = origin_x or 0, origin_y or 0
+    drawShapeFill(fill, x, y, w, h, radius)
+    dither_origin_x, dither_origin_y = 0, 0
 end
 
 --- True when something has changed since the last Ui.draw() and the scene
